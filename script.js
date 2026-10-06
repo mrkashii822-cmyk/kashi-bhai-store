@@ -1776,3 +1776,35 @@ window.closeModal =
 
 window.addToCart =
   addToCart;
+// ===============================
+// MODAL CLOSE HANDLER - FIX
+// ===============================
+
+document.addEventListener("click", function (e) {
+
+  // Close button: X / Continue Shopping
+  const closeButton = e.target.closest("[data-close]");
+
+  if (closeButton) {
+    const modalId = closeButton.getAttribute("data-close");
+
+    if (modalId) {
+      closeModal(modalId);
+    }
+
+    return;
+  }
+
+  // Click on modal overlay
+  const overlay = e.target.closest("[data-close-modal]");
+
+  if (overlay) {
+    const modalId = overlay.getAttribute("data-close-modal");
+
+    if (modalId) {
+      closeModal(modalId);
+    }
+
+    return;
+  }
+});
