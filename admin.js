@@ -49,7 +49,15 @@ let currentUserRole = null;
 
 let authInitialized = false;
 let handlingAuthUserId = null;
-let loginAuditRecordedFor = null;
+
+/*
+  LOGIN audit is intentionally controlled only
+  from handleLogin().
+
+  This prevents duplicate LOGIN entries caused
+  by SIGNED_IN + getSession()/INITIAL_SESSION.
+*/
+let loginAuditRecorded = false;
 
 
 /* =========================================================
@@ -331,6 +339,15 @@ async function initializeAdmin() {
 
   try {
 
+    /*
+      IMPORTANT:
+
+      SIGNED_IN is NOT used for LOGIN audit anymore.
+
+      LOGIN audit is recorded only by handleLogin().
+      This prevents duplicate LOGIN entries.
+    */
+
     supabaseClient.auth.onAuthStateChange(
       (event, session) => {
 
@@ -343,19 +360,13 @@ async function initializeAdmin() {
           session?.user
         ) {
 
-          /*
-            Do not perform heavy Supabase calls
-            directly inside the auth callback.
-          */
-
           setTimeout(
             () => {
 
               handleAuthenticatedUser(
                 session.user,
                 {
-                  auditLogin:
-                    event === "SIGNED_IN"
+                  auditLogin: false
                 }
               );
 
@@ -364,6 +375,7 @@ async function initializeAdmin() {
           );
 
           return;
+
         }
 
 
@@ -375,6 +387,7 @@ async function initializeAdmin() {
           currentUserProfile = null;
           currentUserRole = null;
           handlingAuthUserId = null;
+          loginAuditRecorded = false;
 
           showLoginScreen();
 
@@ -839,6 +852,14 @@ async function handleLogin(event) {
 
   try {
 
+    /*
+      Reset login audit state for this
+      new manual login attempt.
+    */
+
+    loginAuditRecorded = false;
+
+
     const {
       data,
       error
@@ -864,11 +885,7 @@ async function handleLogin(event) {
 
 
     /*
-      IMPORTANT:
-      We now accept either:
-
-      1. Owner → admin_users
-      2. Staff → staff_profiles
+      Check Owner or Staff access.
     */
 
     const access =
@@ -899,11 +916,18 @@ async function handleLogin(event) {
       access.role;
 
 
+    /*
+      Update last login if possible.
+    */
+
     await updateCurrentUserLogin();
 
 
     /*
-      Only record LOGIN once per actual login.
+      IMPORTANT:
+
+      Only this function creates LOGIN audit.
+      Auth callback does NOT create it.
     */
 
     await recordLoginAudit();
@@ -999,6 +1023,7 @@ async function handleLogout() {
   currentUserProfile = null;
   currentUserRole = null;
   handlingAuthUserId = null;
+  loginAuditRecorded = false;
 
   showLoginScreen();
 
@@ -1008,6 +1033,23 @@ async function handleLogout() {
 /* =========================================================
    USER ACCESS CHECK
 ========================================================= */
+
+/*
+  IMPORTANT SECURITY ARCHITECTURE
+
+  OWNER:
+    public.is_admin()
+
+  STAFF:
+    public.current_staff_role()
+
+  We do NOT directly query staff_profiles
+  for staff permission verification because
+  staff_profiles is protected by RLS.
+
+  current_staff_role() is SECURITY DEFINER
+  and safely checks the active staff profile.
+*/
 
 async function getUserAccess(user) {
 
@@ -1024,37 +1066,30 @@ async function getUserAccess(user) {
   }
 
 
-  /*
-    STEP 1:
-    Check existing admin_users table.
-
-    This is the Owner path.
-  */
+  /* =======================================================
+     STEP 1 — OWNER
+  ======================================================= */
 
   try {
 
     const {
-      data: ownerRow,
-      error: ownerError
+      data: isAdmin,
+      error: adminError
     } =
-      await supabaseClient
-        .from("admin_users")
-        .select("user_id")
-        .eq(
-          "user_id",
-          user.id
-        )
-        .maybeSingle();
+      await supabaseClient.rpc(
+        "is_admin"
+      );
 
 
     if (
-      !ownerError &&
-      ownerRow
+      !adminError &&
+      isAdmin === true
     ) {
 
       /*
-        Owner profile is useful for
-        audit/login information.
+        Owner profile is optional for access.
+        The owner can still login if the profile
+        lookup is unavailable.
       */
 
       let profile = null;
@@ -1086,8 +1121,13 @@ async function getUserAccess(user) {
         profile =
           data || null;
 
-      } catch (_) {
-        /* Owner can continue even if profile read fails */
+      } catch (profileError) {
+
+        console.warn(
+          "Owner profile lookup failed:",
+          profileError
+        );
+
       }
 
 
@@ -1102,50 +1142,32 @@ async function getUserAccess(user) {
   } catch (error) {
 
     console.warn(
-      "Owner table check failed:",
+      "Owner RPC check failed:",
       error
     );
 
   }
 
 
-  /*
-    STEP 2:
-    Check staff_profiles.
-
-    A staff account must:
-      role = staff
-      is_active = true
-  */
+  /* =======================================================
+     STEP 2 — STAFF
+  ======================================================= */
 
   try {
 
     const {
-      data: staffRow,
+      data: staffRole,
       error: staffError
     } =
-      await supabaseClient
-        .from("staff_profiles")
-        .select(`
-          user_id,
-          full_name,
-          email,
-          role,
-          is_active,
-          created_at,
-          last_login_at
-        `)
-        .eq(
-          "user_id",
-          user.id
-        )
-        .maybeSingle();
+      await supabaseClient.rpc(
+        "current_staff_role"
+      );
 
 
     if (staffError) {
 
       console.error(
-        "Staff access check error:",
+        "Staff role RPC error:",
         staffError
       );
 
@@ -1160,53 +1182,90 @@ async function getUserAccess(user) {
     }
 
 
-    if (!staffRow) {
+    /*
+      current_staff_role() returns:
 
-      return {
-        allowed: false,
-        role: null,
-        profile: null,
-        message:
-          "This account does not have admin access."
-      };
-
-    }
-
+      "staff" → active staff
+      null    → not staff / disabled
+    */
 
     if (
-      staffRow.role !== "staff"
+      staffRole === "staff"
     ) {
 
+      /*
+        We intentionally do not require
+        a direct staff_profiles SELECT here.
+
+        RLS protects staff_profiles, while
+        current_staff_role() verifies access.
+      */
+
+      let profile = null;
+
+
+      /*
+        Try to get own profile for display/audit.
+        If RLS blocks it, staff login still works.
+      */
+
+      try {
+
+        const {
+          data
+        } =
+          await supabaseClient
+            .from("staff_profiles")
+            .select(`
+              user_id,
+              full_name,
+              email,
+              role,
+              is_active,
+              created_at,
+              last_login_at
+            `)
+            .eq(
+              "user_id",
+              user.id
+            )
+            .maybeSingle();
+
+
+        profile =
+          data || null;
+
+      } catch (profileError) {
+
+        console.warn(
+          "Staff profile lookup unavailable:",
+          profileError
+        );
+
+      }
+
+
       return {
-        allowed: false,
-        role: null,
-        profile: staffRow,
-        message:
-          "This account has an invalid staff role."
+        allowed: true,
+        role: "staff",
+        profile
       };
 
     }
 
 
-    if (
-      staffRow.is_active !== true
-    ) {
-
-      return {
-        allowed: false,
-        role: null,
-        profile: staffRow,
-        message:
-          "This staff account has been disabled."
-      };
-
-    }
-
+    /*
+      RPC returned null.
+      That means this account is not an
+      active staff account.
+    */
 
     return {
-      allowed: true,
-      role: "staff",
-      profile: staffRow
+      allowed: false,
+      role: null,
+      profile: null,
+      message:
+        "This account does not have admin access."
     };
 
   } catch (error) {
@@ -1249,7 +1308,8 @@ async function handleAuthenticatedUser(
 
   /*
     Prevent duplicate INITIAL_SESSION /
-    getSession processing.
+    getSession processing when the app
+    is already visible for this user.
   */
 
   if (
@@ -1289,6 +1349,8 @@ async function handleAuthenticatedUser(
       currentUser = null;
       currentUserProfile = null;
       currentUserRole = null;
+      handlingAuthUserId = null;
+      loginAuditRecorded = false;
 
 
       showLoginScreen();
@@ -1316,34 +1378,30 @@ async function handleAuthenticatedUser(
       access.role;
 
 
-    await updateCurrentUserLogin();
-
-
     /*
-      Existing session on page refresh:
-      do NOT create another LOGIN audit.
+      IMPORTANT:
 
-      Real SIGNED_IN event:
-      create LOGIN audit.
+      Do NOT record LOGIN here.
+
+      LOGIN is recorded only by handleLogin()
+      after a successful manual sign-in.
     */
 
-    if (
-      options.auditLogin === true
-    ) {
-
-      await recordLoginAudit();
-
-    }
+    await updateCurrentUserLogin();
 
 
     await showAdminApp();
 
-  } finally {
+  } catch (error) {
 
-    /*
-      Keep ID while app is active so
-      INITIAL_SESSION doesn't reload everything.
-    */
+    console.error(
+      "Authenticated user handling error:",
+      error
+    );
+
+    handlingAuthUserId = null;
+
+    showLoginScreen();
 
   }
 
@@ -1362,12 +1420,12 @@ async function recordLoginAudit() {
 
 
   /*
-    Prevent duplicate login records.
+    Prevent duplicate LOGIN records during
+    the same browser login flow.
   */
 
   if (
-    loginAuditRecordedFor ===
-    currentUser.id
+    loginAuditRecorded === true
   ) {
 
     return;
@@ -1375,20 +1433,32 @@ async function recordLoginAudit() {
   }
 
 
-  loginAuditRecordedFor =
-    currentUser.id;
+  loginAuditRecorded = true;
 
 
-  await createAuditLog(
-    "LOGIN",
-    "auth_user",
-    currentUser.id,
-    `${
-      currentUserRole === "owner"
-        ? "Owner"
-        : "Staff"
-    } login: ${currentUser.email}`
-  );
+  const success =
+    await createAuditLog(
+      "LOGIN",
+      "auth_user",
+      currentUser.id,
+      `${
+        currentUserRole === "owner"
+          ? "Owner"
+          : "Staff"
+      } login: ${currentUser.email}`
+    );
+
+
+  /*
+    If insert failed, allow another attempt
+    rather than permanently blocking logging.
+  */
+
+  if (!success) {
+
+    loginAuditRecorded = false;
+
+  }
 
 }
 
@@ -1403,6 +1473,17 @@ async function updateCurrentUserLogin() {
     return;
   }
 
+
+  /*
+    Owner profile is writable through existing
+    owner permissions.
+
+    Staff profile is currently protected by
+    owner-only UPDATE RLS.
+
+    Therefore we try the update, but a staff
+    RLS failure must NOT prevent login.
+  */
 
   try {
 
@@ -1567,17 +1648,18 @@ async function showAdminApp() {
     Product Manager is available
     to authenticated owner/staff.
 
-    Note:
-    Product write permissions must also
-    exist in Supabase RLS for staff.
+    NOTE:
+    Staff product write permissions depend
+    on Supabase products RLS.
   */
 
   await loadProducts();
 
 
   /*
-    Only Owner loads staff manager
-    and activity log.
+    Only Owner loads:
+      - Staff Management
+      - Activity Log
   */
 
   if (
@@ -1618,23 +1700,35 @@ function applyRoleBasedUI() {
 
 
   /*
-    Hide staff controls for non-owner
-    even if section exists elsewhere.
+    Owner-only controls
   */
 
-  if (!isOwner) {
+  if (addStaffButton) {
 
-    if (addStaffButton) {
-      addStaffButton.style.display = "none";
-    }
+    addStaffButton.style.display =
+      isOwner
+        ? ""
+        : "none";
 
-    if (refreshStaffButton) {
-      refreshStaffButton.style.display = "none";
-    }
+  }
 
-    if (refreshAuditButton) {
-      refreshAuditButton.style.display = "none";
-    }
+
+  if (refreshStaffButton) {
+
+    refreshStaffButton.style.display =
+      isOwner
+        ? ""
+        : "none";
+
+  }
+
+
+  if (refreshAuditButton) {
+
+    refreshAuditButton.style.display =
+      isOwner
+        ? ""
+        : "none";
 
   }
 
@@ -1735,6 +1829,65 @@ async function loadProducts(
       true
     );
 
+  }
+
+}
+
+
+/* =========================================================
+   PRODUCT STATS
+========================================================= */
+
+function updateStats() {
+
+  const total =
+    products.length;
+
+
+  const active =
+    products.filter(
+      product =>
+        product.is_active === true
+    ).length;
+
+
+  const hidden =
+    products.filter(
+      product =>
+        product.is_active === false
+    ).length;
+
+
+  const outOfStock =
+    products.filter(
+      product =>
+        Number(
+          product.stock || 0
+        ) <= 0
+    ).length;
+
+
+  if (totalProducts) {
+    totalProducts.textContent =
+      total;
+  }
+
+
+  if (activeProducts) {
+    activeProducts.textContent =
+      active;
+  }
+
+
+  if (hiddenProducts) {
+    hiddenProducts.textContent =
+      hidden;
+  }
+
+
+  if (outOfStockProducts) {
+    outOfStockProducts.textContent =
+      outOfStock;
   }
 
 }
@@ -2769,6 +2922,7 @@ async function handleProductSubmit(
     closeModal(productModal);
 
     await loadProducts(true);
+
 
     if (
       currentUserRole === "owner"
@@ -4728,31 +4882,44 @@ async function createAuditLog(
       currentUserProfile;
 
 
+    /*
+      Only attempt profile lookup if we
+      don't already have one.
+
+      Staff profile lookup can be blocked
+      by RLS, but audit still works because
+      role/name/email can fall back safely.
+    */
+
     if (
       !profile
     ) {
 
-      const {
-        data
-      } =
-        await supabaseClient
-          .from("staff_profiles")
-          .select(`
-            user_id,
-            full_name,
-            email,
-            role,
-            is_active
-          `)
-          .eq(
-            "user_id",
-            user.id
-          )
-          .maybeSingle();
+      try {
+
+        const {
+          data
+        } =
+          await supabaseClient
+            .from("staff_profiles")
+            .select(`
+              user_id,
+              full_name,
+              email,
+              role,
+              is_active
+            `)
+            .eq(
+              "user_id",
+              user.id
+            )
+            .maybeSingle();
 
 
-      profile =
-        data || null;
+        profile =
+          data || null;
+
+      } catch (_) {}
 
     }
 
@@ -4771,7 +4938,11 @@ async function createAuditLog(
 
           user_name:
             profile?.full_name ||
-            user.email ||
+            (
+              currentUserRole === "owner"
+                ? "KASHI BHAI Owner"
+                : user.email
+            ) ||
             "Unknown User",
 
           user_role:
