@@ -2,6 +2,7 @@
    KASHI BHAI STORE
    Complete Frontend Script
    Supabase Version
+   Production RPC Checkout
    ========================================================= */
 
 const SUPABASE_URL = "https://lytutzarjtuijwijlhmt.supabase.co";
@@ -271,7 +272,12 @@ function setupEvents() {
       if (minus) {
 
         changeCartQuantity(
-          Number(plusOrMinusId(minus, "data-cart-minus")),
+          Number(
+            plusOrMinusId(
+              minus,
+              "data-cart-minus"
+            )
+          ),
           -1
         );
 
@@ -749,11 +755,6 @@ function applyFilters() {
   filteredProducts =
     allProducts.filter((product) => {
 
-
-      /* -----------------------------------------------------
-         SEARCH
-         ----------------------------------------------------- */
-
       const searchable = [
 
         product.name,
@@ -783,10 +784,6 @@ function applyFilters() {
       }
 
 
-      /* -----------------------------------------------------
-         CATEGORY
-         ----------------------------------------------------- */
-
       if (
         selectedCategory !== "All" &&
         String(product.category || "")
@@ -799,17 +796,9 @@ function applyFilters() {
       }
 
 
-      /* -----------------------------------------------------
-         STOCK
-         ----------------------------------------------------- */
-
       const stock =
         Number(product.stock || 0);
 
-
-      /* -----------------------------------------------------
-         PRICE
-         ----------------------------------------------------- */
 
       const oldPrice =
         Number(product.old_price || 0);
@@ -817,10 +806,6 @@ function applyFilters() {
       const price =
         Number(product.price || 0);
 
-
-      /* -----------------------------------------------------
-         STATUS
-         ----------------------------------------------------- */
 
       if (
         status === "available" &&
@@ -938,8 +923,6 @@ function getProductImageUrl(value) {
   }
 
 
-  /* Already a complete URL */
-
   if (
     /^https?:\/\//i.test(raw)
   ) {
@@ -952,8 +935,6 @@ function getProductImageUrl(value) {
   let path =
     raw.replace(/^\/+/, "");
 
-
-  /* Remove Supabase storage prefix if saved in DB */
 
   const storageMarker =
     "/storage/v1/object/public/product-images/";
@@ -974,16 +955,12 @@ function getProductImageUrl(value) {
   }
 
 
-  /* Remove bucket name if saved as product-images/file.jpg */
-
   path =
     path.replace(
       /^product-images\//i,
       ""
     );
 
-
-  /* Encode every path segment safely */
 
   const encodedPath =
     path
@@ -1069,7 +1046,6 @@ function renderProductCard(product) {
             `
         }
 
-
         ${
           discounted
             ? `
@@ -1079,7 +1055,6 @@ function renderProductCard(product) {
             `
             : ""
         }
-
 
         <span class="stock-badge ${
           available
@@ -1099,7 +1074,6 @@ function renderProductCard(product) {
 
 
       <div class="product-info">
-
 
         <div class="product-category">
 
@@ -1128,7 +1102,6 @@ function renderProductCard(product) {
 
         <div class="product-price">
 
-
           <strong>
 
             Rs. ${formatNumber(price)}
@@ -1145,7 +1118,6 @@ function renderProductCard(product) {
               `
               : ""
           }
-
 
         </div>
 
@@ -1306,8 +1278,6 @@ function cleanInvalidCartItems() {
       }
 
 
-      /* Refresh important product information */
-
       item.name =
         product.name;
 
@@ -1412,8 +1382,6 @@ function addToCart(productId) {
       currentQuantity + 1;
 
 
-    /* Refresh current product data */
-
     existing.stock =
       stock;
 
@@ -1478,8 +1446,6 @@ function addToCart(productId) {
   pulseCartButton();
 
 
-  /* Open cart */
-
   setTimeout(() => {
 
     openCart();
@@ -1508,8 +1474,6 @@ function changeCartQuantity(
 
   if (!item) return;
 
-
-  /* Always check latest product stock */
 
   const latestProduct =
     allProducts.find(
@@ -1722,7 +1686,6 @@ function renderCart() {
 
           <div class="cart-item">
 
-
             <div class="cart-item-image">
 
               ${
@@ -1744,7 +1707,6 @@ function renderCart() {
 
             <div class="cart-item-info">
 
-
               <h4>
 
                 ${escapeHtml(
@@ -1763,7 +1725,6 @@ function renderCart() {
 
 
               <div class="cart-item-controls cart-qty">
-
 
                 <button
                   type="button"
@@ -1789,15 +1750,12 @@ function renderCart() {
                   +
                 </button>
 
-
               </div>
-
 
             </div>
 
 
             <div class="cart-item-right">
-
 
               <strong>
 
@@ -1815,9 +1773,7 @@ function renderCart() {
                 Remove
               </button>
 
-
             </div>
-
 
           </div>
 
@@ -1938,10 +1894,6 @@ function openCheckout() {
   }
 
 
-  /*
-     Refresh cart against currently loaded stock
-  */
-
   let invalidItem = false;
 
 
@@ -1996,17 +1948,17 @@ function openCheckout() {
       item.stock =
         stock;
 
-
       item.price =
         Number(product.price || 0);
-
 
       item.name =
         product.name;
 
-
       item.image_url =
         product.image_url || "";
+
+      item.product_code =
+        product.product_code || null;
 
 
       return true;
@@ -2083,10 +2035,7 @@ function openCheckout() {
     "modal-open"
   );
 
-}
-
-
-/* =========================================================
+}/* =========================================================
    MODAL HELPERS
    ========================================================= */
 
@@ -2181,6 +2130,7 @@ function getFieldValue(id) {
 
 /* =========================================================
    CHECKOUT
+   PRODUCTION RPC VERSION
    ========================================================= */
 
 async function handleCheckout(e) {
@@ -2322,7 +2272,12 @@ async function handleCheckout(e) {
 
 
   /* -------------------------------------------------------
-     FINAL CART / STOCK CHECK
+     FINAL CLIENT-SIDE STOCK CHECK
+     -------------------------------------------------------
+     This is only for user experience.
+
+     The REAL stock protection happens
+     inside the database RPC.
      ------------------------------------------------------- */
 
   for (const item of cart) {
@@ -2340,6 +2295,8 @@ async function handleCheckout(e) {
       showToast(
         "One of the products is no longer available."
       );
+
+      await loadProducts();
 
       return;
 
@@ -2374,11 +2331,14 @@ async function handleCheckout(e) {
         `Only ${currentStock} unit(s) of ${product.name} are available.`
       );
 
+
       item.quantity =
         currentStock;
 
+
       item.stock =
         currentStock;
+
 
       saveCart();
 
@@ -2391,23 +2351,6 @@ async function handleCheckout(e) {
     }
 
   }
-
-
-  /* -------------------------------------------------------
-     TOTALS
-     ------------------------------------------------------- */
-
-  const subtotal =
-    calculateCartTotal();
-
-
-  const deliveryFee =
-    0;
-
-
-  const total =
-    subtotal +
-    deliveryFee;
 
 
   /* -------------------------------------------------------
@@ -2434,451 +2377,158 @@ async function handleCheckout(e) {
   try {
 
     /* =====================================================
-       CUSTOMER
+       PREPARE RPC ITEMS
        ===================================================== */
 
-    let customer =
-      null;
-
-
-    const {
-      data: existingCustomers,
-      error: customerSearchError
-    } =
-      await kbSupabase
-
-        .from("customers")
-
-        .select("*")
-
-        .eq(
-          "phone",
-          phone
-        )
-
-        .limit(1);
-
-
-    if (customerSearchError) {
-
-      throw customerSearchError;
-
-    }
-
-
-    if (
-      existingCustomers &&
-      existingCustomers.length > 0
-    ) {
-
-      customer =
-        existingCustomers[0];
-
-
-      /*
-         Keep existing member ID.
-         Update customer's latest delivery information.
-      */
-
-      const customerUpdate = {
-
-        name:
-          name,
-
-        alternate_phone:
-          alternatePhone || null,
-
-        city:
-          city,
-
-        address:
-          address
-
-      };
-
-
-      const {
-        data: updatedCustomer,
-        error: customerUpdateError
-      } =
-        await kbSupabase
-
-          .from("customers")
-
-          .update(customerUpdate)
-
-          .eq(
-            "id",
-            customer.id
-          )
-
-          .select()
-
-          .single();
-
-
-      if (!customerUpdateError &&
-          updatedCustomer) {
-
-        customer =
-          updatedCustomer;
-
-      }
-
-
-    } else {
-
-      const memberId =
-        await generateMemberId();
-
-
-      const {
-        data: newCustomer,
-        error: customerInsertError
-      } =
-        await kbSupabase
-
-          .from("customers")
-
-          .insert({
-
-            member_id:
-              memberId,
-
-            name:
-              name,
-
-            phone:
-              phone,
-
-            alternate_phone:
-              alternatePhone || null,
-
-            city:
-              city,
-
-            address:
-              address
-
-          })
-
-          .select()
-
-          .single();
-
-
-      if (customerInsertError) {
-
-        throw customerInsertError;
-
-      }
-
-
-      customer =
-        newCustomer;
-
-    }
-
-
-    if (!customer || !customer.id) {
-
-      throw new Error(
-        "Customer could not be created."
-      );
-
-    }
-
-
-    /* =====================================================
-       ORDER ID
-       ===================================================== */
-
-    const orderId =
-      await generateOrderId();
-
-
-    /* =====================================================
-       ORDER
-       ===================================================== */
-
-    const orderPayload = {
-
-      order_id:
-        orderId,
-
-      customer_id:
-        customer.id,
-
-      customer_name:
-        name,
-
-      phone:
-        phone,
-
-      alternate_phone:
-        alternatePhone || null,
-
-      city:
-        city,
-
-      address:
-        address,
-
-      notes:
-        notes || null,
-
-      subtotal:
-        subtotal,
-
-      delivery_fee:
-        deliveryFee,
-
-      total:
-        total,
-
-      payment_method:
-        paymentMethod,
-
-      payment_status:
-        isWalletPayment
-          ? "pending"
-          : "pending",
-
-      order_status:
-        "Pending",
-
-      courier:
-        courier,
-
-      tracking_id:
-        null
-
-    };
-
-
-    /*
-       Add transaction ID when wallet payment is used.
-
-       If your orders table contains transaction_id,
-       it will be saved here.
-    */
-
-    if (transactionId) {
-
-      orderPayload.transaction_id =
-        transactionId;
-
-    }
-
-
-    const {
-      data: order,
-      error: orderError
-    } =
-      await kbSupabase
-
-        .from("orders")
-
-        .insert(orderPayload)
-
-        .select()
-
-        .single();
-
-
-    if (orderError) {
-
-      throw orderError;
-
-    }
-
-
-    if (!order || !order.id) {
-
-      throw new Error(
-        "Order was not created."
-      );
-
-    }
-
-
-    /* =====================================================
-       ORDER ITEMS
-       ===================================================== */
-
-    const orderItems =
+    const rpcItems =
       cart.map((item) => ({
 
-        order_id:
-          order.id,
-
-        product_id:
-          item.id,
-
-        product_code:
-          item.product_code || null,
-
-        product_name:
-          item.name,
+        id:
+          Number(item.id),
 
         quantity:
-          Number(item.quantity),
-
-        unit_price:
-          Number(item.price),
-
-        total_price:
-          Number(item.price) *
           Number(item.quantity)
 
       }));
 
 
-    const {
-      error: itemsError
-    } =
-      await kbSupabase
+    if (!rpcItems.length) {
 
-        .from("order_items")
-
-        .insert(orderItems);
-
-
-    if (itemsError) {
-
-      console.error(
-        "Order items error:",
-        itemsError
+      throw new Error(
+        "Cart is empty."
       );
-
-      throw itemsError;
 
     }
 
 
     /* =====================================================
-       TRACKING ENTRY
+       ATOMIC DATABASE ORDER
+       =====================================================
+
+       IMPORTANT:
+
+       We are NOT creating:
+
+       customers
+       orders
+       order_items
+       order_tracking
+
+       separately anymore.
+
+       Supabase RPC handles everything
+       inside one database transaction.
        ===================================================== */
 
     const {
-      error: trackingError
+      data,
+      error
     } =
-      await kbSupabase
+      await kbSupabase.rpc(
+        "place_order",
+        {
 
-        .from("order_tracking")
+          p_customer_name:
+            name,
 
-        .insert({
+          p_phone:
+            phone,
 
-          order_id:
-            order.id,
+          p_alternate_phone:
+            alternatePhone || null,
 
-          status:
-            "Order Placed",
-
-          location:
+          p_city:
             city,
 
-          note:
-            "Order successfully placed."
+          p_address:
+            address,
 
-        });
+          p_notes:
+            notes || null,
+
+          p_courier:
+            courier,
+
+          p_payment_method:
+            paymentMethod,
+
+          p_transaction_id:
+            transactionId || null,
+
+          p_items:
+            rpcItems
+
+        }
+      );
 
 
-    if (trackingError) {
+    /* -------------------------------------------------------
+       RPC ERROR
+       ------------------------------------------------------- */
 
-      /*
-         Tracking is supplementary.
-         Do not cancel an otherwise successful order.
-      */
+    if (error) {
 
-      console.warn(
-        "Tracking entry failed:",
-        trackingError
+      console.error(
+        "place_order RPC error:",
+        error
+      );
+
+      throw error;
+
+    }
+
+
+    /* -------------------------------------------------------
+       VALIDATE RPC RESPONSE
+       ------------------------------------------------------- */
+
+    if (!data) {
+
+      throw new Error(
+        "The server did not return an order response."
+      );
+
+    }
+
+
+    console.log(
+      "Order RPC response:",
+      data
+    );
+
+
+    if (
+      data.success !== true
+    ) {
+
+      throw new Error(
+        "Order could not be completed."
       );
 
     }
 
 
     /* =====================================================
-       STOCK UPDATE
+       SERVER VALUES
        ===================================================== */
 
-    for (const item of cart) {
-
-      const currentProduct =
-        allProducts.find(
-          (product) =>
-            Number(product.id) ===
-            Number(item.id)
-        );
+    const orderId =
+      data.order_id || "—";
 
 
-      if (!currentProduct) {
-
-        continue;
-
-      }
+    const memberId =
+      data.member_id || "—";
 
 
-      const currentStock =
-        Number(
-          currentProduct.stock || 0
-        );
-
-
-      const quantity =
-        Number(
-          item.quantity || 0
-        );
-
-
-      const newStock =
-        Math.max(
-          0,
-          currentStock -
-          quantity
-        );
-
-
-      const {
-        error: stockError
-      } =
-        await kbSupabase
-
-          .from("products")
-
-          .update({
-
-            stock:
-              newStock
-
-          })
-
-          .eq(
-            "id",
-            item.id
-          );
-
-
-      if (stockError) {
-
-        console.warn(
-          "Stock update failed:",
-          stockError
-        );
-
-      }
-
-    }
+    const serverTotal =
+      Number(
+        data.total ?? calculateCartTotal()
+      );
 
 
     /* =====================================================
-       SUCCESS
+       SUCCESS UI
        ===================================================== */
-
-    const memberId =
-      customer.member_id || "—";
-
 
     const successOrderId =
       document.getElementById(
@@ -2917,14 +2567,14 @@ async function handleCheckout(e) {
     if (successTotal) {
 
       successTotal.textContent =
-        `Rs. ${formatNumber(total)}`;
+        `Rs. ${formatNumber(serverTotal)}`;
 
     }
 
 
-    /* -----------------------------------------------------
+    /* =====================================================
        CLEAR CART
-       ----------------------------------------------------- */
+       ===================================================== */
 
     cart = [];
 
@@ -2936,18 +2586,18 @@ async function handleCheckout(e) {
     renderCart();
 
 
-    /* -----------------------------------------------------
+    /* =====================================================
        CLOSE CHECKOUT
-       ----------------------------------------------------- */
+       ===================================================== */
 
     closeModal(
       "checkoutModal"
     );
 
 
-    /* -----------------------------------------------------
+    /* =====================================================
        SUCCESS MODAL
-       ----------------------------------------------------- */
+       ===================================================== */
 
     const successModal =
       document.getElementById(
@@ -2975,9 +2625,9 @@ async function handleCheckout(e) {
     }
 
 
-    /* -----------------------------------------------------
+    /* =====================================================
        RESET FORM
-       ----------------------------------------------------- */
+       ===================================================== */
 
     if (checkoutForm) {
 
@@ -2986,15 +2636,19 @@ async function handleCheckout(e) {
     }
 
 
-    /* -----------------------------------------------------
-       RELOAD PRODUCTS
-       ----------------------------------------------------- */
+    /* =====================================================
+       REFRESH PRODUCTS
+       ===================================================== */
 
-    setTimeout(() => {
+    /*
+       The RPC has already decreased stock.
 
-      loadProducts();
+       Reloading products gets the real database
+       stock values instead of calculating them
+       in JavaScript.
+    */
 
-    }, 500);
+    await loadProducts();
 
 
   } catch (error) {
@@ -3005,21 +2659,115 @@ async function handleCheckout(e) {
     );
 
 
+    /* -----------------------------------------------------
+       FRIENDLY DATABASE ERROR
+       ----------------------------------------------------- */
+
     let message =
       "Unable to place order. Please try again.";
 
 
-    if (error && error.message) {
+    const rawMessage =
+      error &&
+      error.message
+        ? String(error.message)
+        : "";
 
-      console.error(
-        "Supabase message:",
-        error.message
-      );
+
+    console.error(
+      "Checkout error message:",
+      rawMessage
+    );
+
+
+    if (rawMessage) {
+
+      const lower =
+        rawMessage.toLowerCase();
+
+
+      if (
+        lower.includes("not enough stock") ||
+        lower.includes("out of stock") ||
+        lower.includes("stock changed") ||
+        lower.includes("stock update failed")
+      ) {
+
+        message =
+          rawMessage;
+
+      }
+
+      else if (
+        lower.includes("cart is empty")
+      ) {
+
+        message =
+          "Your cart is empty.";
+
+      }
+
+      else if (
+        lower.includes("customer name")
+      ) {
+
+        message =
+          "Please enter a valid customer name.";
+
+      }
+
+      else if (
+        lower.includes("phone number")
+      ) {
+
+        message =
+          "Please enter a valid phone number.";
+
+      }
+
+      else if (
+        lower.includes("city is required")
+      ) {
+
+        message =
+          "Please enter your city.";
+
+      }
+
+      else if (
+        lower.includes("address is required")
+      ) {
+
+        message =
+          "Please enter your address.";
+
+      }
+
+      else if (
+        lower.includes("product id")
+      ) {
+
+        message =
+          "One of the products is no longer available.";
+
+      }
 
     }
 
 
-    showToast(message);
+    showToast(
+      message
+    );
+
+
+    /*
+       Refresh products after an error.
+
+       This is important because another customer
+       may have purchased the same product.
+    */
+
+    await loadProducts();
 
 
   } finally {
@@ -3040,130 +2788,6 @@ async function handleCheckout(e) {
 
 
 /* =========================================================
-   MEMBER ID
-   ========================================================= */
-
-async function generateMemberId() {
-
-  try {
-
-    const {
-      data,
-      error
-    } =
-      await kbSupabase
-
-        .from("customers")
-
-        .select("member_id")
-
-        .order("id", {
-          ascending: false
-        })
-
-        .limit(1);
-
-
-    if (
-      !error &&
-      data &&
-      data.length &&
-      data[0].member_id
-    ) {
-
-      const match =
-        String(
-          data[0].member_id
-        ).match(/(\d+)$/);
-
-
-      if (match) {
-
-        const next =
-          Number(match[1]) + 1;
-
-
-        return (
-          `KB` +
-          String(next)
-            .padStart(6, "0")
-        );
-
-      }
-
-    }
-
-  } catch (error) {
-
-    console.warn(
-      "Member ID generation:",
-      error
-    );
-
-  }
-
-
-  /*
-     Fallback ID
-  */
-
-  return (
-    `KB` +
-    String(
-      Date.now()
-    ).slice(-6)
-  );
-
-}
-
-
-/* =========================================================
-   ORDER ID
-   ========================================================= */
-
-async function generateOrderId() {
-
-  const date =
-    new Date();
-
-
-  const year =
-    date.getFullYear();
-
-
-  const month =
-    String(
-      date.getMonth() + 1
-    ).padStart(2, "0");
-
-
-  const day =
-    String(
-      date.getDate()
-    ).padStart(2, "0");
-
-
-  const time =
-    String(
-      Date.now()
-    ).slice(-5);
-
-
-  const random =
-    Math.floor(
-      100 +
-      Math.random() * 900
-    );
-
-
-  return (
-    `KB-${year}${month}${day}-${time}${random}`
-  );
-
-}
-
-
-/* =========================================================
    TOAST
    ========================================================= */
 
@@ -3176,11 +2800,6 @@ function showToast(message) {
 
 
   if (!toast) {
-
-    /*
-       Create toast automatically if HTML
-       does not already contain one.
-    */
 
     toast =
       document.createElement("div");
@@ -3222,7 +2841,7 @@ function showToast(message) {
         "show"
       );
 
-    }, 2500);
+    }, 3000);
 
 }
 
@@ -3257,10 +2876,7 @@ function pulseCartButton() {
 
   }, 600);
 
-}
-
-
-/* =========================================================
+}/* =========================================================
    FORMAT NUMBER
    ========================================================= */
 
