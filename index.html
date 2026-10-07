@@ -3,531 +3,771 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KASHI BHAI | Online Store</title>
-  <meta name="description" content="KASHI BHAI - Quality products at affordable prices.">
+
+  <title>KASHI BHAI | Admin Panel</title>
+
+  <meta
+    name="description"
+    content="KASHI BHAI secure admin product management panel."
+  >
+
   <link rel="icon" href="images/logo.jpg">
 
-  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
 </head>
 
 <body>
 
-<header class="site-header">
-  <div class="container header-inner">
+<!-- =========================================================
+     LOGIN SCREEN
+     ========================================================= -->
 
-    <a href="#home" class="brand">
-      <img src="images/logo.jpg" alt="KASHI BHAI">
+<section id="loginScreen" class="login-screen">
+
+  <div class="login-card">
+
+    <div class="login-brand">
+
+      <img
+        src="images/logo.jpg"
+        alt="KASHI BHAI"
+      >
+
       <div>
         <strong>KASHI BHAI</strong>
-        <span>Online Store</span>
+        <span>Admin Panel</span>
       </div>
+
+    </div>
+
+
+    <div class="login-heading">
+
+      <span class="eyebrow">
+        SECURE ACCESS
+      </span>
+
+      <h1>Admin Login</h1>
+
+      <p>
+        Sign in with your authorized KASHI BHAI admin account.
+      </p>
+
+    </div>
+
+
+    <form id="loginForm">
+
+      <label class="form-field">
+
+        <span>Email Address</span>
+
+        <input
+          id="loginEmail"
+          type="email"
+          autocomplete="username"
+          placeholder="Enter admin email"
+          required
+        >
+
+      </label>
+
+
+      <label class="form-field">
+
+        <span>Password</span>
+
+        <input
+          id="loginPassword"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Enter password"
+          required
+        >
+
+      </label>
+
+
+      <button
+        id="loginButton"
+        class="primary-btn full-btn"
+        type="submit"
+      >
+        Login
+      </button>
+
+
+      <p
+        id="loginMessage"
+        class="form-message"
+      ></p>
+
+    </form>
+
+
+    <a
+      href="index.html"
+      class="back-link"
+    >
+      ← Back to Store
     </a>
 
-    <nav class="main-nav">
-      <a href="#home">Home</a>
-      <a href="#shop">Shop</a>
-      <a href="#about">About</a>
-      <a href="#payment">Payment</a>
-      <a href="#policies">Policies</a>
-      <a href="#contact">Contact</a>
-    </nav>
-
-    <button class="cart-button" id="headerCartButton" type="button">
-      <span>Cart</span>
-      <b id="cartCount">0</b>
-    </button>
-
-    <button class="menu-button" id="menuButton" type="button">☰</button>
   </div>
-</header>
 
-<main>
+</section>
 
-  <!-- HERO -->
-  <section class="hero" id="home">
-    <div class="container hero-grid">
-      <div class="hero-content">
-        <span class="eyebrow">WELCOME TO KASHI BHAI</span>
-        <h1>Quality Products.<br><span>Simple Shopping.</span></h1>
-        <p>
-          Discover our available products, check prices, add your favourites
-          to cart and place your order easily.
-        </p>
 
-        <div class="hero-actions">
-          <a href="#shop" class="primary-btn">Shop Now</a>
-          <a href="#contact" class="secondary-btn">Contact Us</a>
-        </div>
+<!-- =========================================================
+     ADMIN APP
+     ========================================================= -->
 
-        <div class="hero-points">
-          <span>✓ Easy Ordering</span>
-          <span>✓ Cash on Delivery</span>
-          <span>✓ E-Wallet Available</span>
-        </div>
-      </div>
+<div
+  id="adminApp"
+  class="admin-app hidden"
+>
 
-      <div class="hero-card">
-        <div class="hero-card-inner">
-          <span>SHOP WITH CONFIDENCE</span>
-          <h2>KASHI<br>BHAI</h2>
-          <p>Affordable products, straightforward service.</p>
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- HEADER -->
 
-  <!-- SHOP -->
-  <section class="section shop-section" id="shop">
-    <div class="container">
+  <header class="admin-header">
 
-      <div class="section-heading">
+    <div class="admin-header-inner">
+
+      <a
+        href="index.html"
+        class="admin-brand"
+      >
+
+        <img
+          src="images/logo.jpg"
+          alt="KASHI BHAI"
+        >
+
         <div>
-          <span class="eyebrow">OUR PRODUCTS</span>
-          <h2>Shop Products</h2>
+          <strong>KASHI BHAI</strong>
+          <span>Admin Panel</span>
         </div>
-        <p id="productStatusText">Loading products...</p>
+
+      </a>
+
+
+      <div class="admin-header-actions">
+
+        <a
+          href="index.html"
+          target="_blank"
+          class="header-link"
+        >
+          View Store
+        </a>
+
+        <button
+          id="logoutButton"
+          class="logout-btn"
+          type="button"
+        >
+          Logout
+        </button>
+
       </div>
 
-      <div class="shop-controls">
+    </div>
 
-        <div class="search-box">
+  </header>
+
+
+  <!-- MAIN -->
+
+  <main class="admin-main">
+
+    <div class="admin-container">
+
+
+      <!-- PAGE TITLE -->
+
+      <section class="admin-page-heading">
+
+        <div>
+
+          <span class="eyebrow">
+            KASHI BHAI MANAGEMENT
+          </span>
+
+          <h1>Product Manager</h1>
+
+          <p>
+            Add, edit, hide, reactivate and manage your store products.
+          </p>
+
+        </div>
+
+
+        <button
+          id="addProductButton"
+          class="primary-btn"
+          type="button"
+        >
+          + Add Product
+        </button>
+
+      </section>
+
+
+      <!-- STATS -->
+
+      <section class="admin-stats">
+
+        <div class="stat-card">
+
+          <span>Total Products</span>
+
+          <strong id="totalProducts">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <span>Active Products</span>
+
+          <strong id="activeProducts">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <span>Hidden Products</span>
+
+          <strong id="hiddenProducts">
+            0
+          </strong>
+
+        </div>
+
+
+        <div class="stat-card">
+
+          <span>Out of Stock</span>
+
+          <strong id="outOfStockProducts">
+            0
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      <!-- TOOLBAR -->
+
+      <section class="admin-toolbar">
+
+        <div class="admin-search">
+
           <span>⌕</span>
+
           <input
+            id="adminSearch"
             type="search"
-            id="productSearch"
-            placeholder="Search products..."
+            placeholder="Search by product name or code..."
             autocomplete="off"
           >
+
         </div>
 
-        <div class="filter-row" id="statusFilters">
-          <button class="filter-button active" data-status-filter="all" type="button">All</button>
-          <button class="filter-button" data-status-filter="available" type="button">Available</button>
-          <button class="filter-button" data-status-filter="out" type="button">Out of Stock</button>
-          <button class="filter-button" data-status-filter="discount" type="button">Discounts</button>
-        </div>
 
-        <div class="category-row" id="categoryFilters"></div>
-      </div>
-
-      <div id="productsGrid" class="products-grid">
-        <div class="loading-card">
-          <div class="spinner"></div>
-          <p>Loading products...</p>
-        </div>
-      </div>
-
-      <div id="emptyProducts" class="empty-state hidden">
-        <div class="empty-icon">⌕</div>
-        <h3>No products found</h3>
-        <p>Try another search or filter.</p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ABOUT -->
-  <section class="section about-section" id="about">
-    <div class="container two-column">
-      <div>
-        <span class="eyebrow">ABOUT US</span>
-        <h2>Welcome to KASHI BHAI</h2>
-        <p>
-          KASHI BHAI is an online wholesale-to-customer store focused on
-          providing useful products at reasonable prices with a simple
-          ordering experience.
-        </p>
-        <p>
-          Browse products, add them to your cart and complete your order
-          online without unnecessary complications.
-        </p>
-      </div>
-
-      <div class="info-card">
-        <div class="info-item">
-          <strong>Easy Shopping</strong>
-          <span>Browse, select and order in a few steps.</span>
-        </div>
-        <div class="info-item">
-          <strong>Multiple Payment Options</strong>
-          <span>Cash on Delivery and E-Wallet.</span>
-        </div>
-        <div class="info-item">
-          <strong>Order Tracking</strong>
-          <span>Track your order using your Order ID.</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PAYMENT -->
-  <section class="section light-section" id="payment">
-    <div class="container">
-      <div class="section-heading centered">
-        <div>
-          <span class="eyebrow">PAYMENT</span>
-          <h2>Payment Methods</h2>
-        </div>
-      </div>
-
-      <div class="payment-grid">
-        <div class="payment-card">
-          <div class="payment-icon">COD</div>
-          <h3>Cash on Delivery</h3>
-          <p>Pay when your order is delivered.</p>
-        </div>
-
-        <div class="payment-card">
-          <div class="payment-icon">E-W</div>
-          <h3>E-Wallet</h3>
-          <p>E-Wallet payments are accepted. Transaction ID is required at checkout.</p>
-        </div>
-
-        <div class="payment-card disabled">
-          <div class="payment-icon">•••</div>
-          <h3>More Methods</h3>
-          <p>Additional payment methods will be introduced later.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- POLICIES -->
-  <section class="section" id="policies">
-    <div class="container">
-      <div class="section-heading centered">
-        <div>
-          <span class="eyebrow">STORE INFORMATION</span>
-          <h2>Policies & Rules</h2>
-        </div>
-      </div>
-
-      <div class="policy-grid">
-        <article class="policy-card">
-          <h3>Orders</h3>
-          <p>
-            Please provide correct name, phone number, city and complete
-            delivery address while placing your order.
-          </p>
-        </article>
-
-        <article class="policy-card">
-          <h3>Product Availability</h3>
-          <p>
-            Products are subject to stock availability. Out-of-stock products
-            cannot be ordered.
-          </p>
-        </article>
-
-        <article class="policy-card">
-          <h3>Delivery</h3>
-          <p>
-            Courier availability and delivery time may vary according to
-            destination and courier service.
-          </p>
-        </article>
-
-        <article class="policy-card">
-          <h3>Customer Information</h3>
-          <p>
-            Please use accurate information so your order can be processed
-            and delivered correctly.
-          </p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- FAQ -->
-  <section class="section light-section" id="faq">
-    <div class="container">
-      <div class="section-heading centered">
-        <div>
-          <span class="eyebrow">HELP</span>
-          <h2>Frequently Asked Questions</h2>
-        </div>
-      </div>
-
-      <div class="faq-list">
-        <details>
-          <summary>How do I place an order?</summary>
-          <p>Add your required products to the cart, open checkout, enter your delivery information and submit the order.</p>
-        </details>
-
-        <details>
-          <summary>Can I pay through Cash on Delivery?</summary>
-          <p>Yes. Cash on Delivery is available.</p>
-        </details>
-
-        <details>
-          <summary>What information is required for E-Wallet?</summary>
-          <p>Select E-Wallet at checkout and provide the transaction ID after making the payment.</p>
-        </details>
-
-        <details>
-          <summary>Can I track my order?</summary>
-          <p>Yes. Your Order ID can be used for order tracking when tracking information is available.</p>
-        </details>
-      </div>
-    </div>
-  </section>
-
-  <!-- CONTACT -->
-  <section class="section contact-section" id="contact">
-    <div class="container contact-box">
-      <div>
-        <span class="eyebrow">CONTACT US</span>
-        <h2>Need Help?</h2>
-        <p>For questions about products or orders, contact us directly.</p>
-      </div>
-
-      <div class="contact-actions">
-        <a href="tel:03115921822" class="contact-number">03115921822</a>
-        <a
-          href="https://wa.me/923115921822"
-          target="_blank"
-          rel="noopener"
-          class="whatsapp-button"
+        <select
+          id="adminStatusFilter"
+          class="admin-select"
         >
-          WhatsApp
-        </a>
-      </div>
-    </div>
-  </section>
 
-</main>
+          <option value="all">
+            All Products
+          </option>
 
-<footer class="site-footer">
-  <div class="container footer-inner">
-    <div>
-      <strong>KASHI BHAI</strong>
-      <p>Quality products. Simple shopping.</p>
-    </div>
+          <option value="active">
+            Active
+          </option>
 
-    <div class="footer-links">
-      <a href="#shop">Shop</a>
-      <a href="#payment">Payment</a>
-      <a href="#policies">Policies</a>
-      <a href="#contact">Contact</a>
-    </div>
+          <option value="hidden">
+            Hidden
+          </option>
 
-    <p class="copyright">© <span id="currentYear"></span> KASHI BHAI. All rights reserved.</p>
-  </div>
-</footer>
+          <option value="out">
+            Out of Stock
+          </option>
+
+        </select>
 
 
-<!-- CART MODAL -->
-<div class="modal" id="cartModal" aria-hidden="true">
-  <div class="modal-overlay" data-close-modal="cartModal"></div>
-
-  <div class="modal-content cart-modal-content">
-    <div class="modal-header">
-      <div>
-        <span class="eyebrow">YOUR CART</span>
-        <h2>Shopping Cart</h2>
-      </div>
-
-      <button class="modal-close" type="button" data-close="cartModal">×</button>
-    </div>
-
-    <div id="cartItems" class="cart-items"></div>
-
-    <div class="cart-footer">
-      <div class="cart-total-row">
-        <span>Subtotal</span>
-        <strong id="cartTotal">Rs. 0</strong>
-      </div>
-
-      <div class="cart-buttons">
-        <button type="button" class="secondary-btn" data-close="cartModal">
-          Continue Shopping
+        <button
+          id="refreshProductsButton"
+          class="secondary-btn"
+          type="button"
+        >
+          Refresh
         </button>
 
-        <button type="button" class="primary-btn" id="checkoutButton">
-          Proceed to Checkout
-        </button>
-      </div>
+      </section>
+
+
+      <!-- STATUS -->
+
+      <div
+        id="adminStatus"
+        class="admin-status"
+      ></div>
+
+
+      <!-- PRODUCT TABLE -->
+
+      <section class="products-panel">
+
+        <div class="panel-heading">
+
+          <div>
+
+            <span class="eyebrow">
+              INVENTORY
+            </span>
+
+            <h2>Products</h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="table-wrapper">
+
+          <table class="products-table">
+
+            <thead>
+
+              <tr>
+
+                <th>Product</th>
+
+                <th>Code</th>
+
+                <th>Price</th>
+
+                <th>Stock</th>
+
+                <th>Category</th>
+
+                <th>Status</th>
+
+                <th>Actions</th>
+
+              </tr>
+
+            </thead>
+
+            <tbody id="productsTableBody">
+
+              <tr>
+
+                <td
+                  colspan="7"
+                  class="table-loading"
+                >
+                  Loading products...
+                </td>
+
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+
+        <div
+          id="emptyTable"
+          class="table-empty hidden"
+        >
+
+          <div class="empty-symbol">
+            📦
+          </div>
+
+          <h3>No products found</h3>
+
+          <p>
+            Try another search or add a new product.
+          </p>
+
+        </div>
+
+      </section>
+
     </div>
-  </div>
+
+  </main>
+
 </div>
 
 
-<!-- CHECKOUT MODAL -->
-<div class="modal" id="checkoutModal" aria-hidden="true">
-  <div class="modal-overlay" data-close-modal="checkoutModal"></div>
+<!-- =========================================================
+     PRODUCT MODAL
+     ========================================================= -->
 
-  <div class="modal-content checkout-modal-content">
+<div
+  id="productModal"
+  class="modal"
+  aria-hidden="true"
+>
+
+  <div
+    class="modal-overlay"
+    data-close-modal="productModal"
+  ></div>
+
+
+  <div class="modal-content product-modal-content">
 
     <div class="modal-header">
+
       <div>
-        <span class="eyebrow">CHECKOUT</span>
-        <h2>Complete Your Order</h2>
+
+        <span class="eyebrow">
+          PRODUCT MANAGEMENT
+        </span>
+
+        <h2 id="productModalTitle">
+          Add Product
+        </h2>
+
       </div>
 
-      <button class="modal-close" type="button" data-close="checkoutModal">×</button>
+
+      <button
+        class="modal-close"
+        type="button"
+        data-close="productModal"
+      >
+        ×
+      </button>
+
     </div>
 
-    <form id="checkoutForm">
+
+    <form id="productForm">
+
+      <input
+        type="hidden"
+        id="editingProductId"
+      >
+
+
+      <!-- IMAGE -->
+
+      <div class="image-upload-section">
+
+        <div
+          id="imagePreview"
+          class="image-preview"
+        >
+
+          <span>
+            No Image
+          </span>
+
+        </div>
+
+
+        <div class="image-upload-controls">
+
+          <label class="upload-btn">
+
+            <span>Choose Product Image</span>
+
+            <input
+              id="productImage"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+            >
+
+          </label>
+
+
+          <small>
+            JPG, PNG or WEBP. Recommended square product image.
+          </small>
+
+          <small id="currentImageText"></small>
+
+        </div>
+
+      </div>
+
+
+      <!-- BASIC INFORMATION -->
 
       <div class="form-section">
-        <h3>Customer Information</h3>
+
+        <h3>Product Information</h3>
+
 
         <div class="form-grid">
 
           <label class="form-field">
-            <span>Full Name *</span>
-            <input id="customerName" type="text" required autocomplete="name">
+
+            <span>
+              Product Code *
+            </span>
+
+            <input
+              id="productCode"
+              type="text"
+              placeholder="Example: P008"
+              required
+            >
+
           </label>
 
-          <label class="form-field">
-            <span>Phone Number *</span>
-            <input id="phone" type="tel" required autocomplete="tel">
-          </label>
 
           <label class="form-field">
-            <span>Alternate Phone</span>
-            <input id="altPhone" type="tel">
+
+            <span>
+              Product Name *
+            </span>
+
+            <input
+              id="productName"
+              type="text"
+              placeholder="Product name"
+              required
+            >
+
           </label>
 
+
           <label class="form-field">
-            <span>City *</span>
-            <input id="city" type="text" required autocomplete="address-level2">
+
+            <span>
+              Price *
+            </span>
+
+            <input
+              id="productPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              required
+            >
+
           </label>
+
+
+          <label class="form-field">
+
+            <span>
+              Old Price
+            </span>
+
+            <input
+              id="productOldPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Optional"
+            >
+
+          </label>
+
+
+          <label class="form-field">
+
+            <span>
+              Stock / Quantity *
+            </span>
+
+            <input
+              id="productStock"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+              required
+            >
+
+          </label>
+
+
+          <label class="form-field">
+
+            <span>
+              Category
+            </span>
+
+            <input
+              id="productCategory"
+              type="text"
+              placeholder="Example: Beauty"
+            >
+
+          </label>
+
 
           <label class="form-field full-width">
-            <span>Complete Address *</span>
-            <textarea id="address" rows="3" required autocomplete="street-address"></textarea>
-          </label>
 
-          <label class="form-field full-width">
-            <span>Order Notes</span>
-            <textarea id="notes" rows="2" placeholder="Optional"></textarea>
-          </label>
-
-        </div>
-      </div>
-
-      <div class="form-section">
-        <h3>Delivery</h3>
-
-        <label class="form-field">
-          <span>Courier *</span>
-          <select id="courier" required>
-            <option value="">Select courier</option>
-            <option value="TCS">TCS</option>
-            <option value="Leopards">Leopards</option>
-            <option value="PostEx">PostEx</option>
-            <option value="DHL">DHL</option>
-            <option value="PEPS">PEPS</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="form-section">
-        <h3>Payment</h3>
-
-        <div class="payment-options">
-
-          <label class="payment-option">
-            <input type="radio" name="paymentMethod" value="COD" checked>
             <span>
-              <strong>Cash on Delivery</strong>
-              <small>Pay when your order arrives.</small>
+              Description
             </span>
+
+            <textarea
+              id="productDescription"
+              rows="4"
+              placeholder="Product description..."
+            ></textarea>
+
           </label>
 
-          <label class="payment-option">
-            <input type="radio" name="paymentMethod" value="E-Wallet">
+
+          <label class="checkbox-field full-width">
+
+            <input
+              id="productActive"
+              type="checkbox"
+              checked
+            >
+
             <span>
-              <strong>E-Wallet</strong>
-              <small>Enter your transaction ID below.</small>
+
+              <strong>
+                Product is Active
+              </strong>
+
+              <small>
+                Active products are visible on the main website.
+              </small>
+
             </span>
+
           </label>
 
         </div>
 
-        <div id="walletSection" class="wallet-section hidden">
-          <label class="form-field">
-            <span>Transaction ID *</span>
-            <input id="transactionId" type="text" placeholder="Enter transaction ID">
-          </label>
-
-          <p class="payment-note">
-            After making your E-Wallet payment, enter the transaction ID here.
-          </p>
-        </div>
       </div>
 
-      <div class="checkout-summary">
-        <span>Order Total</span>
-        <strong id="checkoutTotal">Rs. 0</strong>
+
+      <!-- FORM ACTIONS -->
+
+      <div class="form-actions">
+
+        <button
+          type="button"
+          class="secondary-btn"
+          data-close="productModal"
+        >
+          Cancel
+        </button>
+
+
+        <button
+          id="saveProductButton"
+          type="submit"
+          class="primary-btn"
+        >
+          Save Product
+        </button>
+
       </div>
 
-      <button class="primary-btn checkout-submit" id="placeOrderButton" type="submit">
-        Place Order
-      </button>
+
+      <p
+        id="productFormMessage"
+        class="form-message"
+      ></p>
 
     </form>
+
   </div>
+
 </div>
 
 
-<!-- SUCCESS MODAL -->
-<div class="modal" id="successModal" aria-hidden="true">
-  <div class="modal-overlay"></div>
+<!-- =========================================================
+     CONFIRM MODAL
+     ========================================================= -->
 
-  <div class="modal-content success-modal">
-    <div class="success-icon">✓</div>
-    <span class="eyebrow">ORDER PLACED</span>
-    <h2>Thank You!</h2>
-    <p>Your order has been successfully placed.</p>
+<div
+  id="confirmModal"
+  class="modal"
+  aria-hidden="true"
+>
 
-    <div class="order-result">
-      <div>
-        <span>Order ID</span>
-        <strong id="successOrderId">—</strong>
-      </div>
+  <div
+    class="modal-overlay"
+    data-close-modal="confirmModal"
+  ></div>
 
-      <div id="memberResultRow">
-        <span>Member ID</span>
-        <strong id="successMemberId">—</strong>
-      </div>
 
-      <div>
-        <span>Total</span>
-        <strong id="successTotal">Rs. 0</strong>
-      </div>
+  <div class="modal-content confirm-modal-content">
+
+    <div class="confirm-icon">
+      ?
     </div>
 
-    <p class="success-note">
-      Please keep your Order ID for future reference.
+    <span class="eyebrow">
+      CONFIRM ACTION
+    </span>
+
+    <h2 id="confirmTitle">
+      Are you sure?
+    </h2>
+
+    <p id="confirmText">
+      Please confirm this action.
     </p>
 
-    <button class="primary-btn" type="button" id="successCloseButton">
-      Continue Shopping
-    </button>
+
+    <div class="confirm-actions">
+
+      <button
+        type="button"
+        class="secondary-btn"
+        data-close="confirmModal"
+      >
+        Cancel
+      </button>
+
+
+      <button
+        id="confirmActionButton"
+        type="button"
+        class="danger-btn"
+      >
+        Confirm
+      </button>
+
+    </div>
+
   </div>
+
 </div>
 
 
 <!-- TOAST -->
-<div id="kbToast" class="toast" role="status"></div>
+
+<div
+  id="adminToast"
+  class="admin-toast"
+  role="status"
+></div>
 
 
-<!-- WHATSAPP -->
-<a
-  class="floating-whatsapp"
-  href="https://wa.me/923115921822"
-  target="_blank"
-  rel="noopener"
-  aria-label="Contact KASHI BHAI on WhatsApp"
->
-  WA
-</a>
+<script src="admin.js"></script>
 
-<script src="script.js"></script>
 </body>
 </html>
