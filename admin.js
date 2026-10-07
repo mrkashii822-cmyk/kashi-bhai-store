@@ -1,6 +1,6 @@
 /* =========================================================
    KASHI BHAI ADMIN PANEL
-   Supabase Product Manager
+   Supabase Product + Staff + Audit Manager
 ========================================================= */
 
 "use strict";
@@ -22,7 +22,6 @@ const supabaseClient =
     SUPABASE_KEY
   );
 
-
 const STORAGE_BUCKET =
   "product-images";
 
@@ -33,6 +32,12 @@ const STORAGE_BUCKET =
 
 let products = [];
 let filteredProducts = [];
+
+let staffProfiles = [];
+let auditLogs = [];
+
+let currentUser = null;
+let currentOwnerProfile = null;
 
 let currentConfirmAction = null;
 let toastTimer = null;
@@ -239,6 +244,9 @@ async function initializeAdmin() {
 
         } else {
 
+          currentUser = null;
+          currentOwnerProfile = null;
+
           showLoginScreen();
 
         }
@@ -435,12 +443,6 @@ function setupEventListeners() {
   );
 
 
-  /*
-    Extra delegated click protection.
-    This makes × and Cancel work even if
-    another element interferes with direct listeners.
-  */
-
   document.addEventListener(
     "click",
     handleGlobalModalClicks
@@ -451,7 +453,9 @@ function setupEventListeners() {
     "keydown",
     event => {
 
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape"
+      ) {
 
         closeModal(productModal);
 
@@ -484,6 +488,7 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
+
   }
 
 
@@ -498,6 +503,7 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
+
   }
 
 
@@ -533,7 +539,10 @@ async function handleLogin(event) {
     loginPassword?.value || "";
 
 
-  if (!email || !password) {
+  if (
+    !email ||
+    !password
+  ) {
 
     showLoginMessage(
       "Please enter email and password.",
@@ -541,6 +550,7 @@ async function handleLogin(event) {
     );
 
     return;
+
   }
 
 
@@ -596,6 +606,15 @@ async function handleLogin(event) {
     }
 
 
+    currentUser =
+      data.user;
+
+
+    await loadCurrentOwnerProfile();
+
+    await updateLastLogin();
+
+
     showToast(
       "Login successful.",
       "success"
@@ -641,6 +660,19 @@ async function handleLogout() {
 
   try {
 
+    if (currentUser) {
+
+      await writeAuditLog({
+        action: "LOGOUT",
+        entityType: "authentication",
+        entityId: currentUser.id,
+        description:
+          `${currentOwnerProfile?.full_name || "Owner"} logged out.`
+      });
+
+    }
+
+
     await supabaseClient.auth.signOut();
 
   } catch (error) {
@@ -651,6 +683,11 @@ async function handleLogout() {
     );
 
   }
+
+
+  currentUser = null;
+
+  currentOwnerProfile = null;
 
   showLoginScreen();
 
@@ -682,6 +719,7 @@ async function verifyAdmin() {
       );
 
       return false;
+
     }
 
 
@@ -712,6 +750,7 @@ async function handleAuthenticatedUser(user) {
     showLoginScreen();
 
     return;
+
   }
 
 
@@ -743,7 +782,119 @@ async function handleAuthenticatedUser(user) {
   }
 
 
+  currentUser =
+    user;
+
+
+  await loadCurrentOwnerProfile();
+
+  await updateLastLogin();
+
+
   await showAdminApp();
+
+}
+
+
+/* =========================================================
+   CURRENT OWNER PROFILE
+========================================================= */
+
+async function loadCurrentOwnerProfile() {
+
+  if (!currentUser) {
+    return null;
+  }
+
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("staff_profiles")
+        .select("*")
+        .eq(
+          "user_id",
+          currentUser.id
+        )
+        .eq(
+          "role",
+          "owner"
+        )
+        .eq(
+          "is_active",
+          true
+        )
+        .maybeSingle();
+
+
+    if (error) {
+
+      console.error(
+        "Owner profile error:",
+        error
+      );
+
+      return null;
+
+    }
+
+
+    currentOwnerProfile =
+      data || null;
+
+
+    return currentOwnerProfile;
+
+  } catch (error) {
+
+    console.error(
+      "Owner profile exception:",
+      error
+    );
+
+    return null;
+
+  }
+
+}
+
+
+/* =========================================================
+   UPDATE LAST LOGIN
+========================================================= */
+
+async function updateLastLogin() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  try {
+
+    await supabaseClient
+      .from("staff_profiles")
+      .update({
+        last_login_at:
+          new Date().toISOString()
+      })
+      .eq(
+        "user_id",
+        currentUser.id
+      );
+
+  } catch (error) {
+
+    console.error(
+      "Last login update error:",
+      error
+    );
+
+  }
 
 }
 
@@ -764,26 +915,36 @@ function showLoginScreen() {
 
   if (loginScreen) {
 
-    loginScreen.classList.remove("hidden");
+    loginScreen.classList.remove(
+      "hidden"
+    );
 
-    loginScreen.style.display = "flex";
+    loginScreen.style.display =
+      "flex";
 
-    loginScreen.style.visibility = "visible";
+    loginScreen.style.visibility =
+      "visible";
 
-    loginScreen.style.opacity = "1";
+    loginScreen.style.opacity =
+      "1";
 
-    loginScreen.style.filter = "none";
+    loginScreen.style.filter =
+      "none";
 
-    loginScreen.style.pointerEvents = "auto";
+    loginScreen.style.pointerEvents =
+      "auto";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.add("hidden");
+    adminApp.classList.add(
+      "hidden"
+    );
 
-    adminApp.style.display = "none";
+    adminApp.style.display =
+      "none";
 
   }
 
@@ -809,25 +970,38 @@ async function showAdminApp() {
   forceCloseModal(productModal);
   forceCloseModal(confirmModal);
 
+
   if (loginScreen) {
 
-    loginScreen.classList.add("hidden");
+    loginScreen.classList.add(
+      "hidden"
+    );
 
-    loginScreen.style.display = "none";
+    loginScreen.style.display =
+      "none";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.remove("hidden");
+    adminApp.classList.remove(
+      "hidden"
+    );
 
-    adminApp.style.display = "block";
+    adminApp.style.display =
+      "block";
 
   }
 
 
   await loadProducts();
+
+  await loadStaff();
+
+  await loadAuditLogs();
+
+  injectStaffManager();
 
 }
 
@@ -953,10 +1127,6 @@ function getProductImageUrl(
   }
 
 
-  /*
-    Already a complete URL
-  */
-
   if (
     value.startsWith("http://") ||
     value.startsWith("https://") ||
@@ -967,11 +1137,6 @@ function getProductImageUrl(
 
   }
 
-
-  /*
-    Supabase storage path.
-    Convert filename/path to public URL.
-  */
 
   const cleanPath =
     value
@@ -988,7 +1153,9 @@ function getProductImageUrl(
     supabaseClient
       .storage
       .from(STORAGE_BUCKET)
-      .getPublicUrl(cleanPath);
+      .getPublicUrl(
+        cleanPath
+      );
 
 
   return data?.publicUrl || null;
@@ -1011,7 +1178,8 @@ function applyFilters() {
 
 
   const status =
-    adminStatusFilter?.value || "all";
+    adminStatusFilter?.value ||
+    "all";
 
 
   filteredProducts =
@@ -1094,7 +1262,7 @@ function applyFilters() {
 
 
 /* =========================================================
-   RENDER
+   RENDER PRODUCTS
 ========================================================= */
 
 function renderProducts() {
@@ -1137,7 +1305,7 @@ function renderProducts() {
 
 
 /* =========================================================
-   CREATE ROW
+   PRODUCT ROW
 ========================================================= */
 
 function createProductRow(
@@ -1371,7 +1539,7 @@ function createProductRow(
 
 
 /* =========================================================
-   TABLE ACTIONS
+   PRODUCT TABLE ACTIONS
 ========================================================= */
 
 function handleProductTableClick(
@@ -1473,7 +1641,10 @@ function openAddProductModal() {
 
 
   if (editingProductId) {
-    editingProductId.value = "";
+
+    editingProductId.value =
+      "";
+
   }
 
 
@@ -1612,7 +1783,8 @@ function openEditProductModal(
 
   if (productImage) {
 
-    productImage.value = "";
+    productImage.value =
+      "";
 
   }
 
@@ -1684,7 +1856,6 @@ async function handleProductSubmit(
 ) {
 
   event.preventDefault();
-
 
   clearProductFormMessage();
 
@@ -1823,11 +1994,6 @@ async function handleProductSubmit(
       );
 
 
-    /*
-      Upload only if user selected
-      a new image.
-    */
-
     if (
       productImage?.files?.length > 0
     ) {
@@ -1876,11 +2042,18 @@ async function handleProductSubmit(
     };
 
 
-    /* =====================================================
-       UPDATE
-    ===================================================== */
+    let savedProduct = null;
+
 
     if (productId) {
+
+      const oldProduct =
+        products.find(
+          item =>
+            String(item.id) ===
+            String(productId)
+        );
+
 
       const {
         data,
@@ -1911,19 +2084,40 @@ async function handleProductSubmit(
       }
 
 
+      savedProduct =
+        data;
+
+
+      await writeAuditLog({
+
+        action:
+          "PRODUCT_UPDATED",
+
+        entityType:
+          "product",
+
+        entityId:
+          String(productId),
+
+        description:
+          `Updated product "${name}".`,
+
+        oldData:
+          oldProduct || null,
+
+        newData:
+          data
+
+      });
+
+
       showToast(
         "Product updated successfully.",
         "success"
       );
 
 
-    }
-
-    /* =====================================================
-       INSERT
-    ===================================================== */
-
-    else {
+    } else {
 
       const {
         data,
@@ -1933,6 +2127,7 @@ async function handleProductSubmit(
           .from("products")
           .insert({
             ...payload,
+
             created_at:
               new Date().toISOString()
           })
@@ -1954,6 +2149,33 @@ async function handleProductSubmit(
       }
 
 
+      savedProduct =
+        data;
+
+
+      await writeAuditLog({
+
+        action:
+          "PRODUCT_CREATED",
+
+        entityType:
+          "product",
+
+        entityId:
+          String(data.id),
+
+        description:
+          `Created product "${name}".`,
+
+        oldData:
+          null,
+
+        newData:
+          data
+
+      });
+
+
       showToast(
         "Product added successfully.",
         "success"
@@ -1967,7 +2189,6 @@ async function handleProductSubmit(
 
     await loadProducts(true);
 
-
   } catch (error) {
 
     console.error(
@@ -1980,7 +2201,6 @@ async function handleProductSubmit(
       getFriendlyError(error),
       "error"
     );
-
 
   } finally {
 
@@ -2070,9 +2290,14 @@ async function uploadProductImage(
         uniqueName,
         file,
         {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type
+          cacheControl:
+            "3600",
+
+          upsert:
+            false,
+
+          contentType:
+            file.type
         }
       );
 
@@ -2136,7 +2361,8 @@ function handleImagePreview() {
     );
 
 
-    productImage.value = "";
+    productImage.value =
+      "";
 
     return;
 
@@ -2222,15 +2448,19 @@ function askProductAction(
 ) {
 
   currentConfirmAction = {
+
     productId:
       product.id,
 
     action:
       action
+
   };
 
 
-  if (action === "hide") {
+  if (
+    action === "hide"
+  ) {
 
     if (confirmTitle) {
 
@@ -2326,6 +2556,14 @@ async function executeConfirmAction() {
 
   try {
 
+    const product =
+      products.find(
+        item =>
+          String(item.id) ===
+          String(productId)
+      );
+
+
     const isActive =
       action !== "hide";
 
@@ -2337,11 +2575,13 @@ async function executeConfirmAction() {
       await supabaseClient
         .from("products")
         .update({
+
           is_active:
             isActive,
 
           updated_at:
             new Date().toISOString()
+
         })
         .eq(
           "id",
@@ -2365,6 +2605,33 @@ async function executeConfirmAction() {
     }
 
 
+    await writeAuditLog({
+
+      action:
+        action === "hide"
+          ? "PRODUCT_HIDDEN"
+          : "PRODUCT_REACTIVATED",
+
+      entityType:
+        "product",
+
+      entityId:
+        String(productId),
+
+      description:
+        action === "hide"
+          ? `Hidden product "${product?.name || ""}".`
+          : `Reactivated product "${product?.name || ""}".`,
+
+      oldData:
+        product || null,
+
+      newData:
+        data
+
+    });
+
+
     closeModal(confirmModal);
 
 
@@ -2376,7 +2643,8 @@ async function executeConfirmAction() {
     );
 
 
-    currentConfirmAction = null;
+    currentConfirmAction =
+      null;
 
 
     await loadProducts(true);
@@ -2478,6 +2746,2174 @@ function updateStats() {
 
 
 /* =========================================================
+   STAFF MANAGEMENT
+========================================================= */
+
+/*
+ * Staff manager is created dynamically.
+ * The matching HTML will also be provided separately.
+ */
+
+function injectStaffManager() {
+
+  if (!adminApp) {
+    return;
+  }
+
+
+  if (
+    document.getElementById(
+      "staffManagementSection"
+    )
+  ) {
+
+    renderStaffManager();
+
+    return;
+
+  }
+
+
+  const section =
+    document.createElement("section");
+
+
+  section.id =
+    "staffManagementSection";
+
+
+  section.className =
+    "admin-section staff-management-section";
+
+
+  section.innerHTML = `
+
+    <div class="section-header">
+
+      <div>
+        <span class="section-kicker">
+          OWNER ONLY
+        </span>
+
+        <h2>
+          Staff Management
+        </h2>
+
+        <p>
+          Manage individual staff accounts and access.
+        </p>
+      </div>
+
+      <div class="section-actions">
+
+        <button
+          type="button"
+          class="primary-btn"
+          id="addStaffButton"
+        >
+          + Add Staff
+        </button>
+
+        <button
+          type="button"
+          class="secondary-btn"
+          id="refreshStaffButton"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div class="admin-stats staff-stats">
+
+      <div class="stat-card">
+
+        <span>
+          Total Staff
+        </span>
+
+        <strong id="totalStaff">
+          0
+        </strong>
+
+      </div>
+
+
+      <div class="stat-card">
+
+        <span>
+          Active Staff
+        </span>
+
+        <strong id="activeStaff">
+          0
+        </strong>
+
+      </div>
+
+
+      <div class="stat-card">
+
+        <span>
+          Disabled Staff
+        </span>
+
+        <strong id="disabledStaff">
+          0
+        </strong>
+
+      </div>
+
+    </div>
+
+
+    <div class="admin-toolbar">
+
+      <div class="search-box">
+
+        <input
+          type="search"
+          id="staffSearch"
+          placeholder="Search staff by name or email..."
+        >
+
+      </div>
+
+      <select
+        id="staffStatusFilter"
+      >
+
+        <option value="all">
+          All Staff
+        </option>
+
+        <option value="active">
+          Active
+        </option>
+
+        <option value="disabled">
+          Disabled
+        </option>
+
+      </select>
+
+    </div>
+
+
+    <div class="table-wrapper">
+
+      <table class="admin-table">
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Staff
+            </th>
+
+            <th>
+              Role
+            </th>
+
+            <th>
+              Status
+            </th>
+
+            <th>
+              Last Login
+            </th>
+
+            <th>
+              Created
+            </th>
+
+            <th>
+              Actions
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="staffTableBody">
+        </tbody>
+
+      </table>
+
+    </div>
+
+
+    <div
+      id="staffEmptyTable"
+      class="empty-table hidden"
+    >
+      No staff accounts found.
+    </div>
+
+
+    <div class="section-header activity-header">
+
+      <div>
+
+        <span class="section-kicker">
+          SECURITY
+        </span>
+
+        <h2>
+          Activity Log
+        </h2>
+
+        <p>
+          Login, staff and admin activity history.
+        </p>
+
+      </div>
+
+      <button
+        type="button"
+        class="secondary-btn"
+        id="refreshAuditButton"
+      >
+        Refresh
+      </button>
+
+    </div>
+
+
+    <div class="admin-toolbar">
+
+      <div class="search-box">
+
+        <input
+          type="search"
+          id="auditSearch"
+          placeholder="Search activity..."
+        >
+
+      </div>
+
+    </div>
+
+
+    <div class="table-wrapper">
+
+      <table class="admin-table">
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Date / Time
+            </th>
+
+            <th>
+              User
+            </th>
+
+            <th>
+              Role
+            </th>
+
+            <th>
+              Action
+            </th>
+
+            <th>
+              Entity
+            </th>
+
+            <th>
+              Description
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="auditTableBody">
+        </tbody>
+
+      </table>
+
+    </div>
+
+
+    <div
+      id="auditEmptyTable"
+      class="empty-table hidden"
+    >
+      No activity found.
+    </div>
+
+  `;
+
+
+  adminApp.appendChild(
+    section
+  );
+
+
+  setupStaffEvents();
+
+  renderStaffManager();
+
+  renderAuditLogs();
+
+}
+
+
+/* =========================================================
+   STAFF EVENTS
+========================================================= */
+
+function setupStaffEvents() {
+
+  const addStaffButton =
+    document.getElementById(
+      "addStaffButton"
+    );
+
+
+  const refreshStaffButton =
+    document.getElementById(
+      "refreshStaffButton"
+    );
+
+
+  const refreshAuditButton =
+    document.getElementById(
+      "refreshAuditButton"
+    );
+
+
+  const staffSearch =
+    document.getElementById(
+      "staffSearch"
+    );
+
+
+  const staffStatusFilter =
+    document.getElementById(
+      "staffStatusFilter"
+    );
+
+
+  const auditSearch =
+    document.getElementById(
+      "auditSearch"
+    );
+
+
+  addStaffButton?.addEventListener(
+    "click",
+    openCreateStaffModal
+  );
+
+
+  refreshStaffButton?.addEventListener(
+    "click",
+    async () => {
+
+      await loadStaff();
+
+      showToast(
+        "Staff list refreshed.",
+        "success"
+      );
+
+    }
+  );
+
+
+  refreshAuditButton?.addEventListener(
+    "click",
+    async () => {
+
+      await loadAuditLogs();
+
+      showToast(
+        "Activity log refreshed.",
+        "success"
+      );
+
+    }
+  );
+
+
+  staffSearch?.addEventListener(
+    "input",
+    renderStaffManager
+  );
+
+
+  staffStatusFilter?.addEventListener(
+    "change",
+    renderStaffManager
+  );
+
+
+  auditSearch?.addEventListener(
+    "input",
+    renderAuditLogs
+  );
+
+
+  const staffTableBody =
+    document.getElementById(
+      "staffTableBody"
+    );
+
+
+  staffTableBody?.addEventListener(
+    "click",
+    handleStaffTableClick
+  );
+
+}
+
+
+/* =========================================================
+   LOAD STAFF
+========================================================= */
+
+async function loadStaff() {
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("staff_profiles")
+        .select(`
+          user_id,
+          full_name,
+          email,
+          role,
+          is_active,
+          created_at,
+          last_login_at
+        `)
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    staffProfiles =
+      Array.isArray(data)
+        ? data
+        : [];
+
+
+    renderStaffManager();
+
+
+  } catch (error) {
+
+    console.error(
+      "Load staff error:",
+      error
+    );
+
+
+    showToast(
+      "Could not load staff: " +
+      getFriendlyError(error),
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   STAFF RENDER
+========================================================= */
+
+function renderStaffManager() {
+
+  const tbody =
+    document.getElementById(
+      "staffTableBody"
+    );
+
+
+  if (!tbody) {
+    return;
+  }
+
+
+  const search =
+    (
+      document.getElementById(
+        "staffSearch"
+      )?.value || ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const status =
+    document.getElementById(
+      "staffStatusFilter"
+    )?.value ||
+    "all";
+
+
+  const filtered =
+    staffProfiles.filter(
+      staff => {
+
+        const matchesSearch =
+          !search ||
+          String(
+            staff.full_name || ""
+          )
+            .toLowerCase()
+            .includes(search) ||
+
+          String(
+            staff.email || ""
+          )
+            .toLowerCase()
+            .includes(search);
+
+
+        if (!matchesSearch) {
+          return false;
+        }
+
+
+        if (
+          status === "active"
+        ) {
+
+          return (
+            staff.is_active === true
+          );
+
+        }
+
+
+        if (
+          status === "disabled"
+        ) {
+
+          return (
+            staff.is_active === false
+          );
+
+        }
+
+
+        return true;
+
+      }
+    );
+
+
+  const staffOnly =
+    staffProfiles.filter(
+      staff =>
+        staff.role === "staff"
+    );
+
+
+  const active =
+    staffOnly.filter(
+      staff =>
+        staff.is_active === true
+    ).length;
+
+
+  const disabled =
+    staffOnly.filter(
+      staff =>
+        staff.is_active === false
+    ).length;
+
+
+  setText(
+    "totalStaff",
+    staffOnly.length
+  );
+
+
+  setText(
+    "activeStaff",
+    active
+  );
+
+
+  setText(
+    "disabledStaff",
+    disabled
+  );
+
+
+  tbody.innerHTML = "";
+
+
+  const empty =
+    document.getElementById(
+      "staffEmptyTable"
+    );
+
+
+  if (!filtered.length) {
+
+    empty?.classList.remove(
+      "hidden"
+    );
+
+    return;
+
+  }
+
+
+  empty?.classList.add(
+    "hidden"
+  );
+
+
+  filtered.forEach(
+    staff => {
+
+      tbody.appendChild(
+        createStaffRow(staff)
+      );
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   CREATE STAFF ROW
+========================================================= */
+
+function createStaffRow(
+  staff
+) {
+
+  const tr =
+    document.createElement("tr");
+
+
+  const isCurrentOwner =
+    currentUser &&
+    String(staff.user_id) ===
+    String(currentUser.id);
+
+
+  const status =
+    staff.is_active
+      ? `
+        <span class="status-badge status-active">
+          Active
+        </span>
+      `
+      : `
+        <span class="status-badge status-hidden">
+          Disabled
+        </span>
+      `;
+
+
+  let actionHtml =
+    "";
+
+
+  if (
+    staff.role === "staff"
+  ) {
+
+    actionHtml =
+      staff.is_active
+
+        ? `
+          <button
+            type="button"
+            class="table-action danger"
+            data-staff-action="disable"
+            data-user-id="${escapeAttribute(
+              staff.user_id
+            )}"
+          >
+            Disable
+          </button>
+        `
+
+        : `
+          <button
+            type="button"
+            class="table-action"
+            data-staff-action="enable"
+            data-user-id="${escapeAttribute(
+              staff.user_id
+            )}"
+          >
+            Enable
+          </button>
+        `;
+
+  } else {
+
+    actionHtml =
+      `
+        <span class="owner-label">
+          Owner
+        </span>
+      `;
+
+  }
+
+
+  if (isCurrentOwner) {
+
+    actionHtml =
+      `
+        <span class="owner-label">
+          Current Owner
+        </span>
+      `;
+
+  }
+
+
+  tr.innerHTML = `
+
+    <td>
+
+      <div class="product-table-info">
+
+        <strong>
+          ${escapeHtml(
+            staff.full_name ||
+            "Unnamed"
+          )}
+        </strong>
+
+        <span>
+          ${escapeHtml(
+            staff.email ||
+            "-"
+          )}
+        </span>
+
+      </div>
+
+    </td>
+
+
+    <td>
+
+      <span class="status-badge status-active">
+        ${escapeHtml(
+          staff.role || "staff"
+        )}
+      </span>
+
+    </td>
+
+
+    <td>
+      ${status}
+    </td>
+
+
+    <td>
+      ${formatDateTime(
+        staff.last_login_at
+      )}
+    </td>
+
+
+    <td>
+      ${formatDateTime(
+        staff.created_at
+      )}
+    </td>
+
+
+    <td>
+
+      <div class="product-actions">
+
+        ${actionHtml}
+
+      </div>
+
+    </td>
+
+  `;
+
+
+  return tr;
+
+}
+
+
+/* =========================================================
+   STAFF TABLE ACTION
+========================================================= */
+
+function handleStaffTableClick(
+  event
+) {
+
+  const button =
+    event.target.closest(
+      "[data-staff-action]"
+    );
+
+
+  if (!button) {
+    return;
+  }
+
+
+  const action =
+    button.dataset.staffAction;
+
+
+  const userId =
+    button.dataset.userId;
+
+
+  const staff =
+    staffProfiles.find(
+      item =>
+        String(item.user_id) ===
+        String(userId)
+    );
+
+
+  if (!staff) {
+
+    showToast(
+      "Staff member could not be found.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
+    staff.role === "owner"
+  ) {
+
+    showToast(
+      "The owner account cannot be disabled.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
+    action === "disable"
+  ) {
+
+    askStaffStatusAction(
+      staff,
+      false
+    );
+
+    return;
+
+  }
+
+
+  if (
+    action === "enable"
+  ) {
+
+    askStaffStatusAction(
+      staff,
+      true
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   STAFF CONFIRM
+========================================================= */
+
+function askStaffStatusAction(
+  staff,
+  newStatus
+) {
+
+  currentConfirmAction = {
+
+    type:
+      "staff_status",
+
+    userId:
+      staff.user_id,
+
+    newStatus:
+      newStatus
+
+  };
+
+
+  if (confirmTitle) {
+
+    confirmTitle.textContent =
+      newStatus
+        ? "Enable Staff Account"
+        : "Disable Staff Account";
+
+  }
+
+
+  if (confirmText) {
+
+    confirmText.textContent =
+      newStatus
+
+        ? `"${staff.full_name}" will be able to log in again.`
+
+        : `"${staff.full_name}" will no longer be able to use the admin system.`;
+
+  }
+
+
+  if (confirmActionButton) {
+
+    confirmActionButton.textContent =
+      newStatus
+        ? "Enable Staff"
+        : "Disable Staff";
+
+
+    if (newStatus) {
+
+      confirmActionButton.classList.remove(
+        "danger-btn"
+      );
+
+    } else {
+
+      confirmActionButton.classList.add(
+        "danger-btn"
+      );
+
+    }
+
+  }
+
+
+  openModal(confirmModal);
+
+}
+
+
+/* =========================================================
+   CREATE STAFF MODAL
+========================================================= */
+
+function openCreateStaffModal() {
+
+  const existing =
+    document.getElementById(
+      "createStaffModal"
+    );
+
+
+  if (existing) {
+
+    openModal(existing);
+
+    return;
+
+  }
+
+
+  const modal =
+    document.createElement("div");
+
+
+  modal.id =
+    "createStaffModal";
+
+
+  modal.className =
+    "admin-modal";
+
+
+  modal.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+
+
+  modal.innerHTML = `
+
+    <div
+      class="admin-modal-overlay"
+      data-close-staff-modal
+    ></div>
+
+
+    <div
+      class="admin-modal-content"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="createStaffTitle"
+    >
+
+      <div class="modal-header">
+
+        <div>
+
+          <h2 id="createStaffTitle">
+            Add Staff Account
+          </h2>
+
+          <p>
+            Create a separate login for a staff member.
+          </p>
+
+        </div>
+
+        <button
+          type="button"
+          class="modal-close"
+          id="closeCreateStaffModal"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <form
+        id="createStaffForm"
+        class="admin-form"
+      >
+
+        <div class="form-group">
+
+          <label for="staffFullName">
+            Full Name
+          </label>
+
+          <input
+            type="text"
+            id="staffFullName"
+            autocomplete="name"
+            required
+            maxlength="100"
+            placeholder="Staff member name"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label for="staffEmail">
+            Email
+          </label>
+
+          <input
+            type="email"
+            id="staffEmail"
+            autocomplete="email"
+            required
+            placeholder="staff@gmail.com"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label for="staffPassword">
+            Password
+          </label>
+
+          <input
+            type="password"
+            id="staffPassword"
+            autocomplete="new-password"
+            required
+            minlength="8"
+            placeholder="Minimum 8 characters"
+          >
+
+        </div>
+
+
+        <div class="form-group">
+
+          <label for="staffPasswordConfirm">
+            Confirm Password
+          </label>
+
+          <input
+            type="password"
+            id="staffPasswordConfirm"
+            autocomplete="new-password"
+            required
+            minlength="8"
+            placeholder="Repeat password"
+          >
+
+        </div>
+
+
+        <div
+          id="createStaffMessage"
+          class="form-message"
+        ></div>
+
+
+        <div class="modal-actions">
+
+          <button
+            type="button"
+            class="secondary-btn"
+            id="cancelCreateStaff"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            class="primary-btn"
+            id="createStaffSubmit"
+          >
+            Create Staff
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  `;
+
+
+  document.body.appendChild(
+    modal
+  );
+
+
+  setupCreateStaffModalEvents();
+
+
+  openModal(modal);
+
+}
+
+
+/* =========================================================
+   CREATE STAFF MODAL EVENTS
+========================================================= */
+
+function setupCreateStaffModalEvents() {
+
+  const modal =
+    document.getElementById(
+      "createStaffModal"
+    );
+
+
+  const form =
+    document.getElementById(
+      "createStaffForm"
+    );
+
+
+  const closeButton =
+    document.getElementById(
+      "closeCreateStaffModal"
+    );
+
+
+  const cancelButton =
+    document.getElementById(
+      "cancelCreateStaff"
+    );
+
+
+  const overlay =
+    modal?.querySelector(
+      "[data-close-staff-modal]"
+    );
+
+
+  closeButton?.addEventListener(
+    "click",
+    () => closeModal(modal)
+  );
+
+
+  cancelButton?.addEventListener(
+    "click",
+    () => closeModal(modal)
+  );
+
+
+  overlay?.addEventListener(
+    "click",
+    () => closeModal(modal)
+  );
+
+
+  form?.addEventListener(
+    "submit",
+    handleCreateStaff
+  );
+
+}
+
+
+/* =========================================================
+   CREATE STAFF
+========================================================= */
+
+async function handleCreateStaff(
+  event
+) {
+
+  event.preventDefault();
+
+
+  const name =
+    document.getElementById(
+      "staffFullName"
+    )?.value.trim() || "";
+
+
+  const email =
+    document.getElementById(
+      "staffEmail"
+    )?.value.trim().toLowerCase() || "";
+
+
+  const password =
+    document.getElementById(
+      "staffPassword"
+    )?.value || "";
+
+
+  const confirmPassword =
+    document.getElementById(
+      "staffPasswordConfirm"
+    )?.value || "";
+
+
+  const message =
+    document.getElementById(
+      "createStaffMessage"
+    );
+
+
+  const button =
+    document.getElementById(
+      "createStaffSubmit"
+    );
+
+
+  if (!name) {
+
+    showDynamicMessage(
+      message,
+      "Please enter the staff member's name.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!email) {
+
+    showDynamicMessage(
+      message,
+      "Please enter an email address.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (password.length < 8) {
+
+    showDynamicMessage(
+      message,
+      "Password must be at least 8 characters.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
+    password !==
+    confirmPassword
+  ) {
+
+    showDynamicMessage(
+      message,
+      "Passwords do not match.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  setButtonLoading(
+    button,
+    null,
+    true,
+    "Creating..."
+  );
+
+
+  clearDynamicMessage(
+    message
+  );
+
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.functions.invoke(
+        "create-staff-user",
+        {
+          body: {
+            name,
+            email,
+            password
+          }
+        }
+      );
+
+
+    if (error) {
+
+      let detail =
+        error.message ||
+        "Could not create staff account.";
+
+
+      if (error.context) {
+
+        try {
+
+          const responseBody =
+            await error.context.json();
+
+
+          detail =
+            responseBody?.message ||
+            responseBody?.error ||
+            detail;
+
+        } catch {
+
+          /* Ignore response parsing errors. */
+
+        }
+
+      }
+
+
+      throw new Error(
+        detail
+      );
+
+    }
+
+
+    if (
+      !data?.success
+    ) {
+
+      throw new Error(
+        data?.message ||
+        "Staff account could not be created."
+      );
+
+    }
+
+
+    closeModal(
+      document.getElementById(
+        "createStaffModal"
+      )
+    );
+
+
+    showToast(
+      "Staff account created successfully.",
+      "success"
+    );
+
+
+    await loadStaff();
+
+    await loadAuditLogs();
+
+
+  } catch (error) {
+
+    console.error(
+      "Create staff error:",
+      error
+    );
+
+
+    showDynamicMessage(
+      message,
+      getFriendlyError(error),
+      "error"
+    );
+
+  } finally {
+
+    setButtonLoading(
+      button,
+      null,
+      false,
+      "Create Staff"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   EXECUTE CONFIRM ACTION
+========================================================= */
+
+const originalExecuteConfirmAction =
+  executeConfirmAction;
+
+
+/*
+ * Replace confirm action dispatcher so both
+ * products and staff use the same modal.
+ */
+
+executeConfirmAction =
+  async function () {
+
+    if (!currentConfirmAction) {
+      return;
+    }
+
+
+    if (
+      currentConfirmAction.type ===
+      "staff_status"
+    ) {
+
+      await executeStaffStatusAction();
+
+      return;
+
+    }
+
+
+    await executeProductConfirmAction();
+
+  };
+
+
+/* =========================================================
+   PRODUCT CONFIRM ACTION
+========================================================= */
+
+async function executeProductConfirmAction() {
+
+  const {
+    productId,
+    action
+  } =
+    currentConfirmAction;
+
+
+  setButtonLoading(
+    confirmActionButton,
+    null,
+    true,
+    action === "hide"
+      ? "Hiding..."
+      : "Activating..."
+  );
+
+
+  try {
+
+    const product =
+      products.find(
+        item =>
+          String(item.id) ===
+          String(productId)
+      );
+
+
+    const isActive =
+      action !== "hide";
+
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("products")
+        .update({
+
+          is_active:
+            isActive,
+
+          updated_at:
+            new Date().toISOString()
+
+        })
+        .eq(
+          "id",
+          productId
+        )
+        .select()
+        .single();
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    if (!data) {
+
+      throw new Error(
+        "Product status could not be changed."
+      );
+
+    }
+
+
+    await writeAuditLog({
+
+      action:
+        action === "hide"
+          ? "PRODUCT_HIDDEN"
+          : "PRODUCT_REACTIVATED",
+
+      entityType:
+        "product",
+
+      entityId:
+        String(productId),
+
+      description:
+        action === "hide"
+          ? `Hidden product "${product?.name || ""}".`
+          : `Reactivated product "${product?.name || ""}".`,
+
+      oldData:
+        product || null,
+
+      newData:
+        data
+
+    });
+
+
+    closeModal(
+      confirmModal
+    );
+
+
+    showToast(
+      action === "hide"
+        ? "Product hidden successfully."
+        : "Product reactivated successfully.",
+      "success"
+    );
+
+
+    currentConfirmAction =
+      null;
+
+
+    await loadProducts(true);
+
+    await loadAuditLogs();
+
+
+  } catch (error) {
+
+    console.error(
+      "Product status error:",
+      error
+    );
+
+
+    showToast(
+      getFriendlyError(error),
+      "error"
+    );
+
+
+  } finally {
+
+    setButtonLoading(
+      confirmActionButton,
+      null,
+      false,
+      "Confirm"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   STAFF STATUS ACTION
+========================================================= */
+
+async function executeStaffStatusAction() {
+
+  const {
+    userId,
+    newStatus
+  } =
+    currentConfirmAction;
+
+
+  setButtonLoading(
+    confirmActionButton,
+    null,
+    true,
+    newStatus
+      ? "Enabling..."
+      : "Disabling..."
+  );
+
+
+  try {
+
+    const staff =
+      staffProfiles.find(
+        item =>
+          String(item.user_id) ===
+          String(userId)
+      );
+
+
+    if (!staff) {
+
+      throw new Error(
+        "Staff member could not be found."
+      );
+
+    }
+
+
+    if (
+      staff.role === "owner"
+    ) {
+
+      throw new Error(
+        "The owner account cannot be disabled."
+      );
+
+    }
+
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("staff_profiles")
+        .update({
+
+          is_active:
+            newStatus
+
+        })
+        .eq(
+          "user_id",
+          userId
+        )
+        .select()
+        .single();
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    if (!data) {
+
+      throw new Error(
+        "Staff account status could not be changed."
+      );
+
+    }
+
+
+    await writeAuditLog({
+
+      action:
+        newStatus
+          ? "STAFF_ENABLED"
+          : "STAFF_DISABLED",
+
+      entityType:
+        "staff_profile",
+
+      entityId:
+        String(userId),
+
+      description:
+        newStatus
+          ? `Enabled staff account for "${staff.full_name}".`
+          : `Disabled staff account for "${staff.full_name}".`,
+
+      oldData:
+        staff,
+
+      newData:
+        data
+
+    });
+
+
+    closeModal(
+      confirmModal
+    );
+
+
+    currentConfirmAction =
+      null;
+
+
+    showToast(
+      newStatus
+        ? "Staff account enabled."
+        : "Staff account disabled.",
+      "success"
+    );
+
+
+    await loadStaff();
+
+    await loadAuditLogs();
+
+
+  } catch (error) {
+
+    console.error(
+      "Staff status error:",
+      error
+    );
+
+
+    showToast(
+      getFriendlyError(error),
+      "error"
+    );
+
+  } finally {
+
+    setButtonLoading(
+      confirmActionButton,
+      null,
+      false,
+      "Confirm"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   AUDIT LOGS
+========================================================= */
+
+async function loadAuditLogs() {
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("audit_logs")
+        .select("*")
+        .order(
+          "created_at",
+          {
+            ascending: false
+          }
+        )
+        .limit(200);
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    auditLogs =
+      Array.isArray(data)
+        ? data
+        : [];
+
+
+    renderAuditLogs();
+
+
+  } catch (error) {
+
+    console.error(
+      "Load audit logs error:",
+      error
+    );
+
+
+    auditLogs = [];
+
+    renderAuditLogs();
+
+
+    showToast(
+      "Could not load activity log: " +
+      getFriendlyError(error),
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   RENDER AUDIT LOGS
+========================================================= */
+
+function renderAuditLogs() {
+
+  const tbody =
+    document.getElementById(
+      "auditTableBody"
+    );
+
+
+  if (!tbody) {
+    return;
+  }
+
+
+  const search =
+    (
+      document.getElementById(
+        "auditSearch"
+      )?.value || ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const filtered =
+    auditLogs.filter(
+      log => {
+
+        if (!search) {
+          return true;
+        }
+
+
+        const combined = [
+
+          log.user_name,
+
+          log.user_email,
+
+          log.user_role,
+
+          log.action,
+
+          log.entity_type,
+
+          log.entity_id,
+
+          log.description
+
+        ]
+          .map(
+            value =>
+              String(
+                value || ""
+              )
+                .toLowerCase()
+          )
+          .join(" ");
+
+
+        return combined.includes(
+          search
+        );
+
+      }
+    );
+
+
+  tbody.innerHTML = "";
+
+
+  const empty =
+    document.getElementById(
+      "auditEmptyTable"
+    );
+
+
+  if (!filtered.length) {
+
+    empty?.classList.remove(
+      "hidden"
+    );
+
+    return;
+
+  }
+
+
+  empty?.classList.add(
+    "hidden"
+  );
+
+
+  filtered.forEach(
+    log => {
+
+      const tr =
+        document.createElement("tr");
+
+
+      tr.innerHTML = `
+
+        <td>
+          ${formatDateTime(
+            log.created_at
+          )}
+        </td>
+
+
+        <td>
+
+          <div class="product-table-info">
+
+            <strong>
+              ${escapeHtml(
+                log.user_name ||
+                "Unknown"
+              )}
+            </strong>
+
+            <span>
+              ${escapeHtml(
+                log.user_email ||
+                "-"
+              )}
+            </span>
+
+          </div>
+
+        </td>
+
+
+        <td>
+          ${escapeHtml(
+            log.user_role ||
+            "-"
+          )}
+        </td>
+
+
+        <td>
+
+          <span class="status-badge status-active">
+            ${escapeHtml(
+              log.action ||
+              "-"
+            )}
+          </span>
+
+        </td>
+
+
+        <td>
+          ${escapeHtml(
+            log.entity_type ||
+            "-"
+          )}
+        </td>
+
+
+        <td>
+          ${escapeHtml(
+            log.description ||
+            "-"
+          )}
+        </td>
+
+      `;
+
+
+      tbody.appendChild(
+        tr
+      );
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   WRITE AUDIT LOG
+========================================================= */
+
+async function writeAuditLog({
+  action,
+  entityType = null,
+  entityId = null,
+  description = null,
+  oldData = null,
+  newData = null
+}) {
+
+  if (!currentUser) {
+    return false;
+  }
+
+
+  try {
+
+    const {
+      error
+    } =
+      await supabaseClient
+        .from("audit_logs")
+        .insert({
+
+          user_id:
+            currentUser.id,
+
+          user_email:
+            currentUser.email ||
+            currentOwnerProfile?.email ||
+            null,
+
+          user_name:
+            currentOwnerProfile?.full_name ||
+            "KASHI BHAI Owner",
+
+          user_role:
+            currentOwnerProfile?.role ||
+            "owner",
+
+          action:
+            action,
+
+          entity_type:
+            entityType,
+
+          entity_id:
+            entityId,
+
+          description:
+            description,
+
+          old_data:
+            oldData,
+
+          new_data:
+            newData
+
+        });
+
+
+    if (error) {
+
+      console.error(
+        "Audit insert error:",
+        error
+      );
+
+      return false;
+
+    }
+
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "Audit insert exception:",
+      error
+    );
+
+    return false;
+
+  }
+
+}
+
+
+/* =========================================================
    MODALS
 ========================================================= */
 
@@ -2487,12 +4923,6 @@ function openModal(modal) {
     return;
   }
 
-
-  /*
-    IMPORTANT FIX:
-    Reset every property that forceCloseModal()
-    changes.
-  */
 
   modal.style.display =
     "flex";
@@ -2560,6 +4990,11 @@ function closeModal(modal) {
       "open"
     ) &&
     !confirmModal?.classList.contains(
+      "open"
+    ) &&
+    !document.getElementById(
+      "createStaffModal"
+    )?.classList.contains(
       "open"
     )
   ) {
@@ -2682,6 +5117,50 @@ function clearProductFormMessage() {
 
 
   productFormMessage.className =
+    "form-message";
+
+}
+
+
+/* =========================================================
+   DYNAMIC MESSAGE
+========================================================= */
+
+function showDynamicMessage(
+  element,
+  message,
+  type = "info"
+) {
+
+  if (!element) {
+    return;
+  }
+
+
+  element.textContent =
+    message;
+
+
+  element.className =
+    `form-message ${type}`;
+
+}
+
+
+function clearDynamicMessage(
+  element
+) {
+
+  if (!element) {
+    return;
+  }
+
+
+  element.textContent =
+    "";
+
+
+  element.className =
     "form-message";
 
 }
@@ -2813,10 +5292,14 @@ function setButtonLoading(
    PRICE
 ========================================================= */
 
-function formatPrice(value) {
+function formatPrice(
+  value
+) {
 
   const number =
-    Number(value || 0);
+    Number(
+      value || 0
+    );
 
 
   return (
@@ -2824,9 +5307,52 @@ function formatPrice(value) {
     number.toLocaleString(
       "en-PK",
       {
-        maximumFractionDigits: 2
+        maximumFractionDigits:
+          2
       }
     )
+  );
+
+}
+
+
+/* =========================================================
+   DATE / TIME
+========================================================= */
+
+function formatDateTime(
+  value
+) {
+
+  if (!value) {
+    return "Never";
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+
+    return "-";
+
+  }
+
+
+  return date.toLocaleString(
+    "en-PK",
+    {
+      dateStyle:
+        "medium",
+
+      timeStyle:
+        "short"
+    }
   );
 
 }
@@ -2841,7 +5367,9 @@ function getFileExtension(
 ) {
 
   const parts =
-    String(filename || "")
+    String(
+      filename || ""
+    )
       .split(".");
 
 
@@ -2898,7 +5426,34 @@ function escapeAttribute(
   value
 ) {
 
-  return escapeHtml(value);
+  return escapeHtml(
+    value
+  );
+
+}
+
+
+/* =========================================================
+   SET TEXT
+========================================================= */
+
+function setText(
+  id,
+  value
+) {
+
+  const element =
+    document.getElementById(
+      id
+    );
+
+
+  if (element) {
+
+    element.textContent =
+      value;
+
+  }
 
 }
 
@@ -2985,7 +5540,7 @@ function getFriendlyError(
   ) {
 
     return (
-      "This product code already exists."
+      "This record already exists."
     );
 
   }
@@ -3015,6 +5570,32 @@ function getFriendlyError(
 
     return (
       "Permission denied. Please check the admin permissions."
+    );
+
+  }
+
+
+  if (
+    lower.includes(
+      "owner access required"
+    )
+  ) {
+
+    return (
+      "Only the store owner can perform this action."
+    );
+
+  }
+
+
+  if (
+    lower.includes(
+      "staff account with this email already exists"
+    )
+  ) {
+
+    return (
+      "A staff account with this email already exists."
     );
 
   }
