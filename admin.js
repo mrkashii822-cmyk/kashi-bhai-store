@@ -1,6 +1,6 @@
 /* =========================================================
    KASHI BHAI ADMIN PANEL
-   Supabase Product + Staff + Audit Manager
+   Product Manager + Staff Manager + Activity Log
 ========================================================= */
 
 "use strict";
@@ -34,18 +34,23 @@ let products = [];
 let filteredProducts = [];
 
 let staffProfiles = [];
-let auditLogs = [];
+let filteredStaffProfiles = [];
 
-let currentUser = null;
-let currentOwnerProfile = null;
+let auditLogs = [];
+let filteredAuditLogs = [];
 
 let currentConfirmAction = null;
 let toastTimer = null;
+
+let currentUser = null;
+let currentOwnerProfile = null;
 
 
 /* =========================================================
    DOM
 ========================================================= */
+
+/* LOGIN */
 
 const loginScreen =
   document.getElementById("loginScreen");
@@ -67,6 +72,9 @@ const loginButtonText =
 
 const loginMessage =
   document.getElementById("loginMessage");
+
+
+/* APP */
 
 const adminApp =
   document.getElementById("adminApp");
@@ -174,6 +182,97 @@ const productFormMessage =
 
 
 /* =========================================================
+   STAFF
+========================================================= */
+
+const staffManagementSection =
+  document.getElementById("staffManagementSection");
+
+const addStaffButton =
+  document.getElementById("addStaffButton");
+
+const refreshStaffButton =
+  document.getElementById("refreshStaffButton");
+
+const staffSearch =
+  document.getElementById("staffSearch");
+
+const staffStatusFilter =
+  document.getElementById("staffStatusFilter");
+
+const staffTableBody =
+  document.getElementById("staffTableBody");
+
+const staffEmptyState =
+  document.getElementById("staffEmptyState");
+
+const totalStaff =
+  document.getElementById("totalStaff");
+
+const activeStaff =
+  document.getElementById("activeStaff");
+
+const disabledStaff =
+  document.getElementById("disabledStaff");
+
+
+/* STAFF MODAL */
+
+const staffModal =
+  document.getElementById("staffModal");
+
+const staffModalOverlay =
+  document.getElementById("staffModalOverlay");
+
+const closeStaffModal =
+  document.getElementById("closeStaffModal");
+
+const cancelStaffButton =
+  document.getElementById("cancelStaffButton");
+
+const staffForm =
+  document.getElementById("staffForm");
+
+const staffName =
+  document.getElementById("staffName");
+
+const staffEmail =
+  document.getElementById("staffEmail");
+
+const staffPassword =
+  document.getElementById("staffPassword");
+
+const staffPasswordConfirm =
+  document.getElementById("staffPasswordConfirm");
+
+const createStaffButton =
+  document.getElementById("createStaffButton");
+
+const staffFormMessage =
+  document.getElementById("staffFormMessage");
+
+
+/* =========================================================
+   ACTIVITY LOG
+========================================================= */
+
+const refreshAuditButton =
+  document.getElementById("refreshAuditButton");
+
+const auditSearch =
+  document.getElementById("auditSearch");
+
+const auditActionFilter =
+  document.getElementById("auditActionFilter");
+
+const auditTableBody =
+  document.getElementById("auditTableBody");
+
+const auditEmptyState =
+  document.getElementById("auditEmptyState");
+
+
+/* =========================================================
    CONFIRM MODAL
 ========================================================= */
 
@@ -217,6 +316,7 @@ document.addEventListener(
 async function initializeAdmin() {
 
   forceCloseModal(productModal);
+  forceCloseModal(staffModal);
   forceCloseModal(confirmModal);
 
   showLoginScreen();
@@ -309,17 +409,23 @@ async function initializeAdmin() {
 
 function setupEventListeners() {
 
+  /* LOGIN */
+
   loginForm?.addEventListener(
     "submit",
     handleLogin
   );
 
 
+  /* LOGOUT */
+
   logoutButton?.addEventListener(
     "click",
     handleLogout
   );
 
+
+  /* PRODUCTS */
 
   addProductButton?.addEventListener(
     "click",
@@ -398,6 +504,113 @@ function setupEventListeners() {
   );
 
 
+  productsTableBody?.addEventListener(
+    "click",
+    handleProductTableClick
+  );
+
+
+  /* STAFF */
+
+  addStaffButton?.addEventListener(
+    "click",
+    openStaffModal
+  );
+
+
+  refreshStaffButton?.addEventListener(
+    "click",
+    () => loadStaffProfiles(true)
+  );
+
+
+  staffSearch?.addEventListener(
+    "input",
+    applyStaffFilters
+  );
+
+
+  staffStatusFilter?.addEventListener(
+    "change",
+    applyStaffFilters
+  );
+
+
+  staffForm?.addEventListener(
+    "submit",
+    handleCreateStaff
+  );
+
+
+  closeStaffModal?.addEventListener(
+    "click",
+    event => {
+
+      event.preventDefault();
+
+      closeModal(staffModal);
+
+    }
+  );
+
+
+  cancelStaffButton?.addEventListener(
+    "click",
+    event => {
+
+      event.preventDefault();
+
+      closeModal(staffModal);
+
+    }
+  );
+
+
+  staffModalOverlay?.addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target ===
+        staffModalOverlay
+      ) {
+
+        closeModal(staffModal);
+
+      }
+
+    }
+  );
+
+
+  staffTableBody?.addEventListener(
+    "click",
+    handleStaffTableClick
+  );
+
+
+  /* AUDIT */
+
+  refreshAuditButton?.addEventListener(
+    "click",
+    () => loadAuditLogs(true)
+  );
+
+
+  auditSearch?.addEventListener(
+    "input",
+    applyAuditFilters
+  );
+
+
+  auditActionFilter?.addEventListener(
+    "change",
+    applyAuditFilters
+  );
+
+
+  /* CONFIRM */
+
   cancelConfirmButton?.addEventListener(
     "click",
     event => {
@@ -437,11 +650,7 @@ function setupEventListeners() {
   );
 
 
-  productsTableBody?.addEventListener(
-    "click",
-    handleProductTableClick
-  );
-
+  /* GLOBAL MODAL PROTECTION */
 
   document.addEventListener(
     "click",
@@ -453,11 +662,11 @@ function setupEventListeners() {
     "keydown",
     event => {
 
-      if (
-        event.key === "Escape"
-      ) {
+      if (event.key === "Escape") {
 
         closeModal(productModal);
+
+        closeModal(staffModal);
 
         closeModal(confirmModal);
 
@@ -488,7 +697,6 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
-
   }
 
 
@@ -503,7 +711,34 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
+  }
 
+
+  if (
+    event.target.closest(
+      "#closeStaffModal"
+    )
+  ) {
+
+    event.preventDefault();
+
+    closeModal(staffModal);
+
+    return;
+  }
+
+
+  if (
+    event.target.closest(
+      "#cancelStaffButton"
+    )
+  ) {
+
+    event.preventDefault();
+
+    closeModal(staffModal);
+
+    return;
   }
 
 
@@ -539,10 +774,7 @@ async function handleLogin(event) {
     loginPassword?.value || "";
 
 
-  if (
-    !email ||
-    !password
-  ) {
+  if (!email || !password) {
 
     showLoginMessage(
       "Please enter email and password.",
@@ -550,7 +782,6 @@ async function handleLogin(event) {
     );
 
     return;
-
   }
 
 
@@ -610,9 +841,15 @@ async function handleLogin(event) {
       data.user;
 
 
-    await loadCurrentOwnerProfile();
+    await updateCurrentUserLogin();
 
-    await updateLastLogin();
+
+    await createAuditLog(
+      "LOGIN",
+      "auth_user",
+      currentUser.id,
+      `Admin login: ${currentUser.email}`
+    );
 
 
     showToast(
@@ -660,15 +897,24 @@ async function handleLogout() {
 
   try {
 
-    if (currentUser) {
+    const {
+      data
+    } =
+      await supabaseClient.auth.getUser();
 
-      await writeAuditLog({
-        action: "LOGOUT",
-        entityType: "authentication",
-        entityId: currentUser.id,
-        description:
-          `${currentOwnerProfile?.full_name || "Owner"} logged out.`
-      });
+
+    const user =
+      data?.user || currentUser;
+
+
+    if (user) {
+
+      await createAuditLog(
+        "LOGOUT",
+        "auth_user",
+        user.id,
+        `Admin logout: ${user.email}`
+      );
 
     }
 
@@ -686,7 +932,6 @@ async function handleLogout() {
 
 
   currentUser = null;
-
   currentOwnerProfile = null;
 
   showLoginScreen();
@@ -719,7 +964,6 @@ async function verifyAdmin() {
       );
 
       return false;
-
     }
 
 
@@ -750,7 +994,6 @@ async function handleAuthenticatedUser(user) {
     showLoginScreen();
 
     return;
-
   }
 
 
@@ -786,9 +1029,7 @@ async function handleAuthenticatedUser(user) {
     user;
 
 
-  await loadCurrentOwnerProfile();
-
-  await updateLastLogin();
+  await updateCurrentUserLogin();
 
 
   await showAdminApp();
@@ -797,17 +1038,21 @@ async function handleAuthenticatedUser(user) {
 
 
 /* =========================================================
-   CURRENT OWNER PROFILE
+   CURRENT USER LOGIN TIME
 ========================================================= */
 
-async function loadCurrentOwnerProfile() {
+async function updateCurrentUserLogin() {
 
-  if (!currentUser) {
-    return null;
+  if (!currentUser?.id) {
+    return;
   }
 
 
   try {
+
+    const now =
+      new Date().toISOString();
+
 
     const {
       data,
@@ -815,82 +1060,40 @@ async function loadCurrentOwnerProfile() {
     } =
       await supabaseClient
         .from("staff_profiles")
-        .select("*")
+        .update({
+          last_login_at: now
+        })
         .eq(
           "user_id",
           currentUser.id
         )
-        .eq(
-          "role",
-          "owner"
-        )
-        .eq(
-          "is_active",
-          true
-        )
+        .select()
         .maybeSingle();
 
 
     if (error) {
 
-      console.error(
-        "Owner profile error:",
+      console.warn(
+        "Could not update last login:",
         error
       );
 
-      return null;
+      return;
 
     }
 
 
-    currentOwnerProfile =
-      data || null;
+    if (data) {
 
+      currentOwnerProfile =
+        data;
 
-    return currentOwnerProfile;
-
-  } catch (error) {
-
-    console.error(
-      "Owner profile exception:",
-      error
-    );
-
-    return null;
-
-  }
-
-}
-
-
-/* =========================================================
-   UPDATE LAST LOGIN
-========================================================= */
-
-async function updateLastLogin() {
-
-  if (!currentUser) {
-    return;
-  }
-
-
-  try {
-
-    await supabaseClient
-      .from("staff_profiles")
-      .update({
-        last_login_at:
-          new Date().toISOString()
-      })
-      .eq(
-        "user_id",
-        currentUser.id
-      );
+    }
 
   } catch (error) {
 
-    console.error(
-      "Last login update error:",
+    console.warn(
+      "Last login update exception:",
       error
     );
 
@@ -906,6 +1109,9 @@ async function updateLastLogin() {
 function showLoginScreen() {
 
   forceCloseModal(productModal);
+
+  forceCloseModal(staffModal);
+
   forceCloseModal(confirmModal);
 
   currentConfirmAction = null;
@@ -915,36 +1121,26 @@ function showLoginScreen() {
 
   if (loginScreen) {
 
-    loginScreen.classList.remove(
-      "hidden"
-    );
+    loginScreen.classList.remove("hidden");
 
-    loginScreen.style.display =
-      "flex";
+    loginScreen.style.display = "flex";
 
-    loginScreen.style.visibility =
-      "visible";
+    loginScreen.style.visibility = "visible";
 
-    loginScreen.style.opacity =
-      "1";
+    loginScreen.style.opacity = "1";
 
-    loginScreen.style.filter =
-      "none";
+    loginScreen.style.filter = "none";
 
-    loginScreen.style.pointerEvents =
-      "auto";
+    loginScreen.style.pointerEvents = "auto";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.add(
-      "hidden"
-    );
+    adminApp.classList.add("hidden");
 
-    adminApp.style.display =
-      "none";
+    adminApp.style.display = "none";
 
   }
 
@@ -968,46 +1164,41 @@ function showLoginScreen() {
 async function showAdminApp() {
 
   forceCloseModal(productModal);
+
+  forceCloseModal(staffModal);
+
   forceCloseModal(confirmModal);
 
 
   if (loginScreen) {
 
-    loginScreen.classList.add(
-      "hidden"
-    );
+    loginScreen.classList.add("hidden");
 
-    loginScreen.style.display =
-      "none";
+    loginScreen.style.display = "none";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.remove(
-      "hidden"
-    );
+    adminApp.classList.remove("hidden");
 
-    adminApp.style.display =
-      "block";
+    adminApp.style.display = "block";
 
   }
 
 
   await loadProducts();
 
-  await loadStaff();
+  await loadStaffProfiles();
 
   await loadAuditLogs();
-
-  injectStaffManager();
 
 }
 
 
 /* =========================================================
-   LOAD PRODUCTS
+   PRODUCTS
 ========================================================= */
 
 async function loadProducts(
@@ -1153,9 +1344,7 @@ function getProductImageUrl(
     supabaseClient
       .storage
       .from(STORAGE_BUCKET)
-      .getPublicUrl(
-        cleanPath
-      );
+      .getPublicUrl(cleanPath);
 
 
   return data?.publicUrl || null;
@@ -1164,7 +1353,7 @@ function getProductImageUrl(
 
 
 /* =========================================================
-   FILTERS
+   PRODUCT FILTERS
 ========================================================= */
 
 function applyFilters() {
@@ -1178,8 +1367,7 @@ function applyFilters() {
 
 
   const status =
-    adminStatusFilter?.value ||
-    "all";
+    adminStatusFilter?.value || "all";
 
 
   filteredProducts =
@@ -1262,7 +1450,7 @@ function applyFilters() {
 
 
 /* =========================================================
-   RENDER PRODUCTS
+   PRODUCT RENDER
 ========================================================= */
 
 function renderProducts() {
@@ -1445,12 +1633,14 @@ function createProductRow(
 
 
     <td>
+
       <span class="product-code">
         ${escapeHtml(
           product.product_code ||
           "-"
         )}
       </span>
+
     </td>
 
 
@@ -1641,10 +1831,7 @@ function openAddProductModal() {
 
 
   if (editingProductId) {
-
-    editingProductId.value =
-      "";
-
+    editingProductId.value = "";
   }
 
 
@@ -1783,8 +1970,7 @@ function openEditProductModal(
 
   if (productImage) {
 
-    productImage.value =
-      "";
+    productImage.value = "";
 
   }
 
@@ -1856,6 +2042,7 @@ async function handleProductSubmit(
 ) {
 
   event.preventDefault();
+
 
   clearProductFormMessage();
 
@@ -2042,8 +2229,7 @@ async function handleProductSubmit(
     };
 
 
-    let savedProduct = null;
-
+    /* UPDATE */
 
     if (productId) {
 
@@ -2084,31 +2270,14 @@ async function handleProductSubmit(
       }
 
 
-      savedProduct =
-        data;
-
-
-      await writeAuditLog({
-
-        action:
-          "PRODUCT_UPDATED",
-
-        entityType:
-          "product",
-
-        entityId:
-          String(productId),
-
-        description:
-          `Updated product "${name}".`,
-
-        oldData:
-          oldProduct || null,
-
-        newData:
-          data
-
-      });
+      await createAuditLog(
+        "UPDATE_PRODUCT",
+        "product",
+        String(data.id),
+        `Updated product ${data.product_code} — ${data.name}`,
+        oldProduct || null,
+        data
+      );
 
 
       showToast(
@@ -2117,7 +2286,11 @@ async function handleProductSubmit(
       );
 
 
-    } else {
+    }
+
+    /* INSERT */
+
+    else {
 
       const {
         data,
@@ -2127,7 +2300,6 @@ async function handleProductSubmit(
           .from("products")
           .insert({
             ...payload,
-
             created_at:
               new Date().toISOString()
           })
@@ -2149,31 +2321,14 @@ async function handleProductSubmit(
       }
 
 
-      savedProduct =
-        data;
-
-
-      await writeAuditLog({
-
-        action:
-          "PRODUCT_CREATED",
-
-        entityType:
-          "product",
-
-        entityId:
-          String(data.id),
-
-        description:
-          `Created product "${name}".`,
-
-        oldData:
-          null,
-
-        newData:
-          data
-
-      });
+      await createAuditLog(
+        "CREATE_PRODUCT",
+        "product",
+        String(data.id),
+        `Created product ${data.product_code} — ${data.name}`,
+        null,
+        data
+      );
 
 
       showToast(
@@ -2189,6 +2344,9 @@ async function handleProductSubmit(
 
     await loadProducts(true);
 
+    await loadAuditLogs();
+
+
   } catch (error) {
 
     console.error(
@@ -2201,6 +2359,7 @@ async function handleProductSubmit(
       getFriendlyError(error),
       "error"
     );
+
 
   } finally {
 
@@ -2290,14 +2449,9 @@ async function uploadProductImage(
         uniqueName,
         file,
         {
-          cacheControl:
-            "3600",
-
-          upsert:
-            false,
-
-          contentType:
-            file.type
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type
         }
       );
 
@@ -2361,8 +2515,7 @@ function handleImagePreview() {
     );
 
 
-    productImage.value =
-      "";
+    productImage.value = "";
 
     return;
 
@@ -2448,19 +2601,15 @@ function askProductAction(
 ) {
 
   currentConfirmAction = {
-
     productId:
       product.id,
 
     action:
       action
-
   };
 
 
-  if (
-    action === "hide"
-  ) {
+  if (action === "hide") {
 
     if (confirmTitle) {
 
@@ -2556,7 +2705,7 @@ async function executeConfirmAction() {
 
   try {
 
-    const product =
+    const oldProduct =
       products.find(
         item =>
           String(item.id) ===
@@ -2575,13 +2724,11 @@ async function executeConfirmAction() {
       await supabaseClient
         .from("products")
         .update({
-
           is_active:
             isActive,
 
           updated_at:
             new Date().toISOString()
-
         })
         .eq(
           "id",
@@ -2605,31 +2752,18 @@ async function executeConfirmAction() {
     }
 
 
-    await writeAuditLog({
-
-      action:
-        action === "hide"
-          ? "PRODUCT_HIDDEN"
-          : "PRODUCT_REACTIVATED",
-
-      entityType:
-        "product",
-
-      entityId:
-        String(productId),
-
-      description:
-        action === "hide"
-          ? `Hidden product "${product?.name || ""}".`
-          : `Reactivated product "${product?.name || ""}".`,
-
-      oldData:
-        product || null,
-
-      newData:
-        data
-
-    });
+    await createAuditLog(
+      action === "hide"
+        ? "HIDE_PRODUCT"
+        : "REACTIVATE_PRODUCT",
+      "product",
+      String(productId),
+      action === "hide"
+        ? `Hidden product ${data.product_code} — ${data.name}`
+        : `Reactivated product ${data.product_code} — ${data.name}`,
+      oldProduct || null,
+      data
+    );
 
 
     closeModal(confirmModal);
@@ -2643,11 +2777,12 @@ async function executeConfirmAction() {
     );
 
 
-    currentConfirmAction =
-      null;
+    currentConfirmAction = null;
 
 
     await loadProducts(true);
+
+    await loadAuditLogs();
 
 
   } catch (error) {
@@ -2679,7 +2814,7 @@ async function executeConfirmAction() {
 
 
 /* =========================================================
-   STATS
+   PRODUCT STATS
 ========================================================= */
 
 function updateStats() {
@@ -2749,439 +2884,19 @@ function updateStats() {
    STAFF MANAGEMENT
 ========================================================= */
 
-/*
- * Staff manager is created dynamically.
- * The matching HTML will also be provided separately.
- */
+async function loadStaffProfiles(
+  showLoading = false
+) {
 
-function injectStaffManager() {
+  if (showLoading) {
 
-  if (!adminApp) {
-    return;
-  }
-
-
-  if (
-    document.getElementById(
-      "staffManagementSection"
-    )
-  ) {
-
-    renderStaffManager();
-
-    return;
+    showToast(
+      "Refreshing staff...",
+      "info"
+    );
 
   }
 
-
-  const section =
-    document.createElement("section");
-
-
-  section.id =
-    "staffManagementSection";
-
-
-  section.className =
-    "admin-section staff-management-section";
-
-
-  section.innerHTML = `
-
-    <div class="section-header">
-
-      <div>
-        <span class="section-kicker">
-          OWNER ONLY
-        </span>
-
-        <h2>
-          Staff Management
-        </h2>
-
-        <p>
-          Manage individual staff accounts and access.
-        </p>
-      </div>
-
-      <div class="section-actions">
-
-        <button
-          type="button"
-          class="primary-btn"
-          id="addStaffButton"
-        >
-          + Add Staff
-        </button>
-
-        <button
-          type="button"
-          class="secondary-btn"
-          id="refreshStaffButton"
-        >
-          Refresh
-        </button>
-
-      </div>
-
-    </div>
-
-
-    <div class="admin-stats staff-stats">
-
-      <div class="stat-card">
-
-        <span>
-          Total Staff
-        </span>
-
-        <strong id="totalStaff">
-          0
-        </strong>
-
-      </div>
-
-
-      <div class="stat-card">
-
-        <span>
-          Active Staff
-        </span>
-
-        <strong id="activeStaff">
-          0
-        </strong>
-
-      </div>
-
-
-      <div class="stat-card">
-
-        <span>
-          Disabled Staff
-        </span>
-
-        <strong id="disabledStaff">
-          0
-        </strong>
-
-      </div>
-
-    </div>
-
-
-    <div class="admin-toolbar">
-
-      <div class="search-box">
-
-        <input
-          type="search"
-          id="staffSearch"
-          placeholder="Search staff by name or email..."
-        >
-
-      </div>
-
-      <select
-        id="staffStatusFilter"
-      >
-
-        <option value="all">
-          All Staff
-        </option>
-
-        <option value="active">
-          Active
-        </option>
-
-        <option value="disabled">
-          Disabled
-        </option>
-
-      </select>
-
-    </div>
-
-
-    <div class="table-wrapper">
-
-      <table class="admin-table">
-
-        <thead>
-
-          <tr>
-
-            <th>
-              Staff
-            </th>
-
-            <th>
-              Role
-            </th>
-
-            <th>
-              Status
-            </th>
-
-            <th>
-              Last Login
-            </th>
-
-            <th>
-              Created
-            </th>
-
-            <th>
-              Actions
-            </th>
-
-          </tr>
-
-        </thead>
-
-        <tbody id="staffTableBody">
-        </tbody>
-
-      </table>
-
-    </div>
-
-
-    <div
-      id="staffEmptyTable"
-      class="empty-table hidden"
-    >
-      No staff accounts found.
-    </div>
-
-
-    <div class="section-header activity-header">
-
-      <div>
-
-        <span class="section-kicker">
-          SECURITY
-        </span>
-
-        <h2>
-          Activity Log
-        </h2>
-
-        <p>
-          Login, staff and admin activity history.
-        </p>
-
-      </div>
-
-      <button
-        type="button"
-        class="secondary-btn"
-        id="refreshAuditButton"
-      >
-        Refresh
-      </button>
-
-    </div>
-
-
-    <div class="admin-toolbar">
-
-      <div class="search-box">
-
-        <input
-          type="search"
-          id="auditSearch"
-          placeholder="Search activity..."
-        >
-
-      </div>
-
-    </div>
-
-
-    <div class="table-wrapper">
-
-      <table class="admin-table">
-
-        <thead>
-
-          <tr>
-
-            <th>
-              Date / Time
-            </th>
-
-            <th>
-              User
-            </th>
-
-            <th>
-              Role
-            </th>
-
-            <th>
-              Action
-            </th>
-
-            <th>
-              Entity
-            </th>
-
-            <th>
-              Description
-            </th>
-
-          </tr>
-
-        </thead>
-
-        <tbody id="auditTableBody">
-        </tbody>
-
-      </table>
-
-    </div>
-
-
-    <div
-      id="auditEmptyTable"
-      class="empty-table hidden"
-    >
-      No activity found.
-    </div>
-
-  `;
-
-
-  adminApp.appendChild(
-    section
-  );
-
-
-  setupStaffEvents();
-
-  renderStaffManager();
-
-  renderAuditLogs();
-
-}
-
-
-/* =========================================================
-   STAFF EVENTS
-========================================================= */
-
-function setupStaffEvents() {
-
-  const addStaffButton =
-    document.getElementById(
-      "addStaffButton"
-    );
-
-
-  const refreshStaffButton =
-    document.getElementById(
-      "refreshStaffButton"
-    );
-
-
-  const refreshAuditButton =
-    document.getElementById(
-      "refreshAuditButton"
-    );
-
-
-  const staffSearch =
-    document.getElementById(
-      "staffSearch"
-    );
-
-
-  const staffStatusFilter =
-    document.getElementById(
-      "staffStatusFilter"
-    );
-
-
-  const auditSearch =
-    document.getElementById(
-      "auditSearch"
-    );
-
-
-  addStaffButton?.addEventListener(
-    "click",
-    openCreateStaffModal
-  );
-
-
-  refreshStaffButton?.addEventListener(
-    "click",
-    async () => {
-
-      await loadStaff();
-
-      showToast(
-        "Staff list refreshed.",
-        "success"
-      );
-
-    }
-  );
-
-
-  refreshAuditButton?.addEventListener(
-    "click",
-    async () => {
-
-      await loadAuditLogs();
-
-      showToast(
-        "Activity log refreshed.",
-        "success"
-      );
-
-    }
-  );
-
-
-  staffSearch?.addEventListener(
-    "input",
-    renderStaffManager
-  );
-
-
-  staffStatusFilter?.addEventListener(
-    "change",
-    renderStaffManager
-  );
-
-
-  auditSearch?.addEventListener(
-    "input",
-    renderAuditLogs
-  );
-
-
-  const staffTableBody =
-    document.getElementById(
-      "staffTableBody"
-    );
-
-
-  staffTableBody?.addEventListener(
-    "click",
-    handleStaffTableClick
-  );
-
-}
-
-
-/* =========================================================
-   LOAD STAFF
-========================================================= */
-
-async function loadStaff() {
 
   try {
 
@@ -3219,7 +2934,9 @@ async function loadStaff() {
         : [];
 
 
-    renderStaffManager();
+    updateStaffStats();
+
+    applyStaffFilters();
 
 
   } catch (error) {
@@ -3228,6 +2945,13 @@ async function loadStaff() {
       "Load staff error:",
       error
     );
+
+
+    staffProfiles = [];
+
+    updateStaffStats();
+
+    applyStaffFilters();
 
 
     showToast(
@@ -3242,53 +2966,103 @@ async function loadStaff() {
 
 
 /* =========================================================
-   STAFF RENDER
+   STAFF STATS
 ========================================================= */
 
-function renderStaffManager() {
+function updateStaffStats() {
 
-  const tbody =
-    document.getElementById(
-      "staffTableBody"
-    );
+  const total =
+    staffProfiles.filter(
+      profile =>
+        profile.role === "staff"
+    ).length;
 
 
-  if (!tbody) {
-    return;
+  const active =
+    staffProfiles.filter(
+      profile =>
+        profile.role === "staff" &&
+        profile.is_active === true
+    ).length;
+
+
+  const disabled =
+    staffProfiles.filter(
+      profile =>
+        profile.role === "staff" &&
+        profile.is_active === false
+    ).length;
+
+
+  if (totalStaff) {
+
+    totalStaff.textContent =
+      total;
+
   }
 
 
+  if (activeStaff) {
+
+    activeStaff.textContent =
+      active;
+
+  }
+
+
+  if (disabledStaff) {
+
+    disabledStaff.textContent =
+      disabled;
+
+  }
+
+}
+
+
+/* =========================================================
+   STAFF FILTER
+========================================================= */
+
+function applyStaffFilters() {
+
   const search =
     (
-      document.getElementById(
-        "staffSearch"
-      )?.value || ""
+      staffSearch?.value || ""
     )
       .trim()
       .toLowerCase();
 
 
   const status =
-    document.getElementById(
-      "staffStatusFilter"
-    )?.value ||
-    "all";
+    staffStatusFilter?.value || "all";
 
 
-  const filtered =
+  filteredStaffProfiles =
     staffProfiles.filter(
-      staff => {
+      profile => {
+
+        /* Owner is shown in data but not in staff list */
+
+        if (
+          profile.role !== "staff"
+        ) {
+
+          return false;
+
+        }
+
 
         const matchesSearch =
           !search ||
           String(
-            staff.full_name || ""
+            profile.full_name || ""
           )
             .toLowerCase()
             .includes(search) ||
 
           String(
-            staff.email || ""
+            profile.email || ""
           )
             .toLowerCase()
             .includes(search);
@@ -3304,7 +3078,7 @@ function renderStaffManager() {
         ) {
 
           return (
-            staff.is_active === true
+            profile.is_active === true
           );
 
         }
@@ -3315,7 +3089,7 @@ function renderStaffManager() {
         ) {
 
           return (
-            staff.is_active === false
+            profile.is_active === false
           );
 
         }
@@ -3327,75 +3101,54 @@ function renderStaffManager() {
     );
 
 
-  const staffOnly =
-    staffProfiles.filter(
-      staff =>
-        staff.role === "staff"
-    );
+  renderStaff();
+
+}
 
 
-  const active =
-    staffOnly.filter(
-      staff =>
-        staff.is_active === true
-    ).length;
+/* =========================================================
+   STAFF RENDER
+========================================================= */
+
+function renderStaff() {
+
+  if (!staffTableBody) {
+    return;
+  }
 
 
-  const disabled =
-    staffOnly.filter(
-      staff =>
-        staff.is_active === false
-    ).length;
+  staffTableBody.innerHTML = "";
 
 
-  setText(
-    "totalStaff",
-    staffOnly.length
-  );
+  if (
+    !filteredStaffProfiles.length
+  ) {
 
+    if (staffEmptyState) {
 
-  setText(
-    "activeStaff",
-    active
-  );
+      staffEmptyState.style.display =
+        "block";
 
-
-  setText(
-    "disabledStaff",
-    disabled
-  );
-
-
-  tbody.innerHTML = "";
-
-
-  const empty =
-    document.getElementById(
-      "staffEmptyTable"
-    );
-
-
-  if (!filtered.length) {
-
-    empty?.classList.remove(
-      "hidden"
-    );
+    }
 
     return;
 
   }
 
 
-  empty?.classList.add(
-    "hidden"
-  );
+  if (staffEmptyState) {
+
+    staffEmptyState.style.display =
+      "none";
+
+  }
 
 
-  filtered.forEach(
-    staff => {
+  filteredStaffProfiles.forEach(
+    profile => {
 
-      tbody.appendChild(
-        createStaffRow(staff)
+      staffTableBody.appendChild(
+        createStaffRow(profile)
       );
 
     }
@@ -3405,114 +3158,61 @@ function renderStaffManager() {
 
 
 /* =========================================================
-   CREATE STAFF ROW
+   STAFF ROW
 ========================================================= */
 
 function createStaffRow(
-  staff
+  profile
 ) {
 
   const tr =
     document.createElement("tr");
 
 
-  const isCurrentOwner =
-    currentUser &&
-    String(staff.user_id) ===
-    String(currentUser.id);
+  const statusClass =
+    profile.is_active
+      ? "active"
+      : "disabled";
 
 
-  const status =
-    staff.is_active
-      ? `
-        <span class="status-badge status-active">
-          Active
-        </span>
-      `
-      : `
-        <span class="status-badge status-hidden">
-          Disabled
-        </span>
-      `;
+  const statusText =
+    profile.is_active
+      ? "Active"
+      : "Disabled";
 
 
-  let actionHtml =
-    "";
+  const lastLogin =
+    profile.last_login_at
+      ? formatDateTime(
+          profile.last_login_at
+        )
+      : "Never";
 
 
-  if (
-    staff.role === "staff"
-  ) {
-
-    actionHtml =
-      staff.is_active
-
-        ? `
-          <button
-            type="button"
-            class="table-action danger"
-            data-staff-action="disable"
-            data-user-id="${escapeAttribute(
-              staff.user_id
-            )}"
-          >
-            Disable
-          </button>
-        `
-
-        : `
-          <button
-            type="button"
-            class="table-action"
-            data-staff-action="enable"
-            data-user-id="${escapeAttribute(
-              staff.user_id
-            )}"
-          >
-            Enable
-          </button>
-        `;
-
-  } else {
-
-    actionHtml =
-      `
-        <span class="owner-label">
-          Owner
-        </span>
-      `;
-
-  }
-
-
-  if (isCurrentOwner) {
-
-    actionHtml =
-      `
-        <span class="owner-label">
-          Current Owner
-        </span>
-      `;
-
-  }
+  const created =
+    profile.created_at
+      ? formatDate(
+          profile.created_at
+        )
+      : "-";
 
 
   tr.innerHTML = `
 
     <td>
 
-      <div class="product-table-info">
+      <div class="staff-name-cell">
 
         <strong>
           ${escapeHtml(
-            staff.full_name ||
-            "Unnamed"
+            profile.full_name ||
+            "Unnamed Staff"
           )}
         </strong>
 
         <span>
           ${escapeHtml(
-            staff.email ||
+            profile.email ||
             "-"
           )}
         </span>
@@ -3524,41 +3224,58 @@ function createStaffRow(
 
     <td>
 
-      <span class="status-badge status-active">
-        ${escapeHtml(
-          staff.role || "staff"
-        )}
+      <span class="role-badge staff">
+        Staff
       </span>
 
     </td>
 
 
     <td>
-      ${status}
+
+      <span class="staff-status-badge ${statusClass}">
+        ${statusText}
+      </span>
+
     </td>
 
 
     <td>
-      ${formatDateTime(
-        staff.last_login_at
-      )}
+      ${escapeHtml(created)}
     </td>
 
 
     <td>
-      ${formatDateTime(
-        staff.created_at
-      )}
+      ${escapeHtml(lastLogin)}
     </td>
 
 
     <td>
 
-      <div class="product-actions">
+      <button
+        type="button"
+        class="staff-action-btn ${
+          profile.is_active
+            ? "danger"
+            : ""
+        }"
+        data-staff-action="${
+          profile.is_active
+            ? "disable"
+            : "enable"
+        }"
+        data-user-id="${escapeAttribute(
+          profile.user_id
+        )}"
+      >
 
-        ${actionHtml}
+        ${
+          profile.is_active
+            ? "Disable"
+            : "Enable"
+        }
 
-      </div>
+      </button>
 
     </td>
 
@@ -3597,7 +3314,7 @@ function handleStaffTableClick(
     button.dataset.userId;
 
 
-  const staff =
+  const profile =
     staffProfiles.find(
       item =>
         String(item.user_id) ===
@@ -3605,24 +3322,10 @@ function handleStaffTableClick(
     );
 
 
-  if (!staff) {
+  if (!profile) {
 
     showToast(
-      "Staff member could not be found.",
-      "error"
-    );
-
-    return;
-
-  }
-
-
-  if (
-    staff.role === "owner"
-  ) {
-
-    showToast(
-      "The owner account cannot be disabled.",
+      "Staff account could not be found.",
       "error"
     );
 
@@ -3635,8 +3338,8 @@ function handleStaffTableClick(
     action === "disable"
   ) {
 
-    askStaffStatusAction(
-      staff,
+    askStaffAction(
+      profile,
       false
     );
 
@@ -3649,8 +3352,8 @@ function handleStaffTableClick(
     action === "enable"
   ) {
 
-    askStaffStatusAction(
-      staff,
+    askStaffAction(
+      profile,
       true
     );
 
@@ -3663,29 +3366,24 @@ function handleStaffTableClick(
    STAFF CONFIRM
 ========================================================= */
 
-function askStaffStatusAction(
-  staff,
-  newStatus
+function askStaffAction(
+  profile,
+  enable
 ) {
 
   currentConfirmAction = {
-
-    type:
-      "staff_status",
-
+    type: "staff",
     userId:
-      staff.user_id,
-
-    newStatus:
-      newStatus
-
+      profile.user_id,
+    enable:
+      enable
   };
 
 
   if (confirmTitle) {
 
     confirmTitle.textContent =
-      newStatus
+      enable
         ? "Enable Staff Account"
         : "Disable Staff Account";
 
@@ -3695,11 +3393,11 @@ function askStaffStatusAction(
   if (confirmText) {
 
     confirmText.textContent =
-      newStatus
+      enable
 
-        ? `"${staff.full_name}" will be able to log in again.`
+        ? `"${profile.full_name}" will be allowed to sign in again.`
 
-        : `"${staff.full_name}" will no longer be able to use the admin system.`;
+        : `"${profile.full_name}" will no longer be allowed to use the staff portal.`;
 
   }
 
@@ -3707,12 +3405,12 @@ function askStaffStatusAction(
   if (confirmActionButton) {
 
     confirmActionButton.textContent =
-      newStatus
+      enable
         ? "Enable Staff"
         : "Disable Staff";
 
 
-    if (newStatus) {
+    if (enable) {
 
       confirmActionButton.classList.remove(
         "danger-btn"
@@ -3738,260 +3436,28 @@ function askStaffStatusAction(
    CREATE STAFF MODAL
 ========================================================= */
 
-function openCreateStaffModal() {
+function openStaffModal() {
 
-  const existing =
-    document.getElementById(
-      "createStaffModal"
-    );
+  if (staffForm) {
 
-
-  if (existing) {
-
-    openModal(existing);
-
-    return;
+    staffForm.reset();
 
   }
 
 
-  const modal =
-    document.createElement("div");
+  clearStaffFormMessage();
 
 
-  modal.id =
-    "createStaffModal";
+  openModal(staffModal);
 
 
-  modal.className =
-    "admin-modal";
+  setTimeout(
+    () => {
 
+      staffName?.focus();
 
-  modal.setAttribute(
-    "aria-hidden",
-    "true"
-  );
-
-
-  modal.innerHTML = `
-
-    <div
-      class="admin-modal-overlay"
-      data-close-staff-modal
-    ></div>
-
-
-    <div
-      class="admin-modal-content"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="createStaffTitle"
-    >
-
-      <div class="modal-header">
-
-        <div>
-
-          <h2 id="createStaffTitle">
-            Add Staff Account
-          </h2>
-
-          <p>
-            Create a separate login for a staff member.
-          </p>
-
-        </div>
-
-        <button
-          type="button"
-          class="modal-close"
-          id="closeCreateStaffModal"
-        >
-          ×
-        </button>
-
-      </div>
-
-
-      <form
-        id="createStaffForm"
-        class="admin-form"
-      >
-
-        <div class="form-group">
-
-          <label for="staffFullName">
-            Full Name
-          </label>
-
-          <input
-            type="text"
-            id="staffFullName"
-            autocomplete="name"
-            required
-            maxlength="100"
-            placeholder="Staff member name"
-          >
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label for="staffEmail">
-            Email
-          </label>
-
-          <input
-            type="email"
-            id="staffEmail"
-            autocomplete="email"
-            required
-            placeholder="staff@gmail.com"
-          >
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label for="staffPassword">
-            Password
-          </label>
-
-          <input
-            type="password"
-            id="staffPassword"
-            autocomplete="new-password"
-            required
-            minlength="8"
-            placeholder="Minimum 8 characters"
-          >
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label for="staffPasswordConfirm">
-            Confirm Password
-          </label>
-
-          <input
-            type="password"
-            id="staffPasswordConfirm"
-            autocomplete="new-password"
-            required
-            minlength="8"
-            placeholder="Repeat password"
-          >
-
-        </div>
-
-
-        <div
-          id="createStaffMessage"
-          class="form-message"
-        ></div>
-
-
-        <div class="modal-actions">
-
-          <button
-            type="button"
-            class="secondary-btn"
-            id="cancelCreateStaff"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            class="primary-btn"
-            id="createStaffSubmit"
-          >
-            Create Staff
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  `;
-
-
-  document.body.appendChild(
-    modal
-  );
-
-
-  setupCreateStaffModalEvents();
-
-
-  openModal(modal);
-
-}
-
-
-/* =========================================================
-   CREATE STAFF MODAL EVENTS
-========================================================= */
-
-function setupCreateStaffModalEvents() {
-
-  const modal =
-    document.getElementById(
-      "createStaffModal"
-    );
-
-
-  const form =
-    document.getElementById(
-      "createStaffForm"
-    );
-
-
-  const closeButton =
-    document.getElementById(
-      "closeCreateStaffModal"
-    );
-
-
-  const cancelButton =
-    document.getElementById(
-      "cancelCreateStaff"
-    );
-
-
-  const overlay =
-    modal?.querySelector(
-      "[data-close-staff-modal]"
-    );
-
-
-  closeButton?.addEventListener(
-    "click",
-    () => closeModal(modal)
-  );
-
-
-  cancelButton?.addEventListener(
-    "click",
-    () => closeModal(modal)
-  );
-
-
-  overlay?.addEventListener(
-    "click",
-    () => closeModal(modal)
-  );
-
-
-  form?.addEventListener(
-    "submit",
-    handleCreateStaff
+    },
+    100
   );
 
 }
@@ -4008,47 +3474,29 @@ async function handleCreateStaff(
   event.preventDefault();
 
 
+  clearStaffFormMessage();
+
+
   const name =
-    document.getElementById(
-      "staffFullName"
-    )?.value.trim() || "";
+    staffName?.value.trim() || "";
 
 
   const email =
-    document.getElementById(
-      "staffEmail"
-    )?.value.trim().toLowerCase() || "";
+    staffEmail?.value.trim().toLowerCase() || "";
 
 
   const password =
-    document.getElementById(
-      "staffPassword"
-    )?.value || "";
+    staffPassword?.value || "";
 
 
   const confirmPassword =
-    document.getElementById(
-      "staffPasswordConfirm"
-    )?.value || "";
-
-
-  const message =
-    document.getElementById(
-      "createStaffMessage"
-    );
-
-
-  const button =
-    document.getElementById(
-      "createStaffSubmit"
-    );
+    staffPasswordConfirm?.value || "";
 
 
   if (!name) {
 
-    showDynamicMessage(
-      message,
-      "Please enter the staff member's name.",
+    showStaffFormMessage(
+      "Full name is required.",
       "error"
     );
 
@@ -4059,9 +3507,8 @@ async function handleCreateStaff(
 
   if (!email) {
 
-    showDynamicMessage(
-      message,
-      "Please enter an email address.",
+    showStaffFormMessage(
+      "Email is required.",
       "error"
     );
 
@@ -4070,10 +3517,11 @@ async function handleCreateStaff(
   }
 
 
-  if (password.length < 8) {
+  if (
+    password.length < 8
+  ) {
 
-    showDynamicMessage(
-      message,
+    showStaffFormMessage(
       "Password must be at least 8 characters.",
       "error"
     );
@@ -4084,12 +3532,10 @@ async function handleCreateStaff(
 
 
   if (
-    password !==
-    confirmPassword
+    password !== confirmPassword
   ) {
 
-    showDynamicMessage(
-      message,
+    showStaffFormMessage(
       "Passwords do not match.",
       "error"
     );
@@ -4100,19 +3546,21 @@ async function handleCreateStaff(
 
 
   setButtonLoading(
-    button,
+    createStaffButton,
     null,
     true,
     "Creating..."
   );
 
 
-  clearDynamicMessage(
-    message
-  );
-
-
   try {
+
+    /*
+      IMPORTANT:
+      No service_role key is used here.
+      Staff account creation happens
+      through the Supabase Edge Function.
+    */
 
     const {
       data,
@@ -4146,22 +3594,18 @@ async function handleCreateStaff(
 
 
           detail =
-            responseBody?.message ||
             responseBody?.error ||
+            responseBody?.message ||
             detail;
 
-        } catch {
-
-          /* Ignore response parsing errors. */
-
+        } catch (_) {
+          /* Ignore invalid error body */
         }
 
       }
 
 
-      throw new Error(
-        detail
-      );
+      throw new Error(detail);
 
     }
 
@@ -4171,27 +3615,23 @@ async function handleCreateStaff(
     ) {
 
       throw new Error(
-        data?.message ||
+        data?.error ||
         "Staff account could not be created."
       );
 
     }
 
 
-    closeModal(
-      document.getElementById(
-        "createStaffModal"
-      )
-    );
-
-
     showToast(
-      "Staff account created successfully.",
+      `Staff account created for ${email}.`,
       "success"
     );
 
 
-    await loadStaff();
+    closeModal(staffModal);
+
+
+    await loadStaffProfiles();
 
     await loadAuditLogs();
 
@@ -4204,16 +3644,16 @@ async function handleCreateStaff(
     );
 
 
-    showDynamicMessage(
-      message,
+    showStaffFormMessage(
       getFriendlyError(error),
       "error"
     );
 
+
   } finally {
 
     setButtonLoading(
-      button,
+      createStaffButton,
       null,
       false,
       "Create Staff"
@@ -4228,42 +3668,176 @@ async function handleCreateStaff(
    EXECUTE CONFIRM ACTION
 ========================================================= */
 
-const originalExecuteConfirmAction =
-  executeConfirmAction;
+async function executeConfirmAction() {
+
+  if (!currentConfirmAction) {
+    return;
+  }
 
 
-/*
- * Replace confirm action dispatcher so both
- * products and staff use the same modal.
- */
+  /* STAFF ACTION */
 
-executeConfirmAction =
-  async function () {
+  if (
+    currentConfirmAction.type ===
+    "staff"
+  ) {
 
-    if (!currentConfirmAction) {
-      return;
-    }
+    await executeStaffStatusChange();
 
+    return;
 
-    if (
-      currentConfirmAction.type ===
-      "staff_status"
-    ) {
-
-      await executeStaffStatusAction();
-
-      return;
-
-    }
+  }
 
 
-    await executeProductConfirmAction();
+  /* PRODUCT ACTION */
 
-  };
+  await executeProductConfirmAction();
+
+}
 
 
 /* =========================================================
-   PRODUCT CONFIRM ACTION
+   EXECUTE STAFF STATUS CHANGE
+========================================================= */
+
+async function executeStaffStatusChange() {
+
+  const {
+    userId,
+    enable
+  } =
+    currentConfirmAction;
+
+
+  setButtonLoading(
+    confirmActionButton,
+    null,
+    true,
+    enable
+      ? "Enabling..."
+      : "Disabling..."
+  );
+
+
+  try {
+
+    const profile =
+      staffProfiles.find(
+        item =>
+          String(item.user_id) ===
+          String(userId)
+      );
+
+
+    if (!profile) {
+
+      throw new Error(
+        "Staff profile could not be found."
+      );
+
+    }
+
+
+    const oldData =
+      {
+        ...profile
+      };
+
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient
+        .from("staff_profiles")
+        .update({
+          is_active:
+            enable
+        })
+        .eq(
+          "user_id",
+          userId
+        )
+        .select()
+        .single();
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    if (!data) {
+
+      throw new Error(
+        "Staff status could not be changed."
+      );
+
+    }
+
+
+    await createAuditLog(
+      enable
+        ? "ENABLE_STAFF"
+        : "DISABLE_STAFF",
+      "staff_profile",
+      String(userId),
+      enable
+        ? `Enabled staff account: ${data.full_name}`
+        : `Disabled staff account: ${data.full_name}`,
+      oldData,
+      data
+    );
+
+
+    closeModal(confirmModal);
+
+
+    currentConfirmAction = null;
+
+
+    showToast(
+      enable
+        ? "Staff account enabled."
+        : "Staff account disabled.",
+      "success"
+    );
+
+
+    await loadStaffProfiles();
+
+    await loadAuditLogs();
+
+
+  } catch (error) {
+
+    console.error(
+      "Staff status error:",
+      error
+    );
+
+
+    showToast(
+      getFriendlyError(error),
+      "error"
+    );
+
+  } finally {
+
+    setButtonLoading(
+      confirmActionButton,
+      null,
+      false,
+      "Confirm"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   EXECUTE PRODUCT CONFIRM ACTION
 ========================================================= */
 
 async function executeProductConfirmAction() {
@@ -4287,7 +3861,7 @@ async function executeProductConfirmAction() {
 
   try {
 
-    const product =
+    const oldProduct =
       products.find(
         item =>
           String(item.id) ===
@@ -4306,13 +3880,11 @@ async function executeProductConfirmAction() {
       await supabaseClient
         .from("products")
         .update({
-
           is_active:
             isActive,
 
           updated_at:
             new Date().toISOString()
-
         })
         .eq(
           "id",
@@ -4336,36 +3908,21 @@ async function executeProductConfirmAction() {
     }
 
 
-    await writeAuditLog({
-
-      action:
-        action === "hide"
-          ? "PRODUCT_HIDDEN"
-          : "PRODUCT_REACTIVATED",
-
-      entityType:
-        "product",
-
-      entityId:
-        String(productId),
-
-      description:
-        action === "hide"
-          ? `Hidden product "${product?.name || ""}".`
-          : `Reactivated product "${product?.name || ""}".`,
-
-      oldData:
-        product || null,
-
-      newData:
-        data
-
-    });
-
-
-    closeModal(
-      confirmModal
+    await createAuditLog(
+      action === "hide"
+        ? "HIDE_PRODUCT"
+        : "REACTIVATE_PRODUCT",
+      "product",
+      String(productId),
+      action === "hide"
+        ? `Hidden product ${data.product_code} — ${data.name}`
+        : `Reactivated product ${data.product_code} — ${data.name}`,
+      oldProduct || null,
+      data
     );
+
+
+    closeModal(confirmModal);
 
 
     showToast(
@@ -4376,8 +3933,7 @@ async function executeProductConfirmAction() {
     );
 
 
-    currentConfirmAction =
-      null;
+    currentConfirmAction = null;
 
 
     await loadProducts(true);
@@ -4414,173 +3970,22 @@ async function executeProductConfirmAction() {
 
 
 /* =========================================================
-   STAFF STATUS ACTION
+   AUDIT LOG
 ========================================================= */
 
-async function executeStaffStatusAction() {
+async function loadAuditLogs(
+  showLoading = false
+) {
 
-  const {
-    userId,
-    newStatus
-  } =
-    currentConfirmAction;
-
-
-  setButtonLoading(
-    confirmActionButton,
-    null,
-    true,
-    newStatus
-      ? "Enabling..."
-      : "Disabling..."
-  );
-
-
-  try {
-
-    const staff =
-      staffProfiles.find(
-        item =>
-          String(item.user_id) ===
-          String(userId)
-      );
-
-
-    if (!staff) {
-
-      throw new Error(
-        "Staff member could not be found."
-      );
-
-    }
-
-
-    if (
-      staff.role === "owner"
-    ) {
-
-      throw new Error(
-        "The owner account cannot be disabled."
-      );
-
-    }
-
-
-    const {
-      data,
-      error
-    } =
-      await supabaseClient
-        .from("staff_profiles")
-        .update({
-
-          is_active:
-            newStatus
-
-        })
-        .eq(
-          "user_id",
-          userId
-        )
-        .select()
-        .single();
-
-
-    if (error) {
-      throw error;
-    }
-
-
-    if (!data) {
-
-      throw new Error(
-        "Staff account status could not be changed."
-      );
-
-    }
-
-
-    await writeAuditLog({
-
-      action:
-        newStatus
-          ? "STAFF_ENABLED"
-          : "STAFF_DISABLED",
-
-      entityType:
-        "staff_profile",
-
-      entityId:
-        String(userId),
-
-      description:
-        newStatus
-          ? `Enabled staff account for "${staff.full_name}".`
-          : `Disabled staff account for "${staff.full_name}".`,
-
-      oldData:
-        staff,
-
-      newData:
-        data
-
-    });
-
-
-    closeModal(
-      confirmModal
-    );
-
-
-    currentConfirmAction =
-      null;
-
+  if (showLoading) {
 
     showToast(
-      newStatus
-        ? "Staff account enabled."
-        : "Staff account disabled.",
-      "success"
-    );
-
-
-    await loadStaff();
-
-    await loadAuditLogs();
-
-
-  } catch (error) {
-
-    console.error(
-      "Staff status error:",
-      error
-    );
-
-
-    showToast(
-      getFriendlyError(error),
-      "error"
-    );
-
-  } finally {
-
-    setButtonLoading(
-      confirmActionButton,
-      null,
-      false,
-      "Confirm"
+      "Refreshing activity log...",
+      "info"
     );
 
   }
 
-}
-
-
-/* =========================================================
-   AUDIT LOGS
-========================================================= */
-
-async function loadAuditLogs() {
 
   try {
 
@@ -4590,14 +3995,27 @@ async function loadAuditLogs() {
     } =
       await supabaseClient
         .from("audit_logs")
-        .select("*")
+        .select(`
+          id,
+          user_id,
+          user_email,
+          user_name,
+          user_role,
+          action,
+          entity_type,
+          entity_id,
+          description,
+          old_data,
+          new_data,
+          created_at
+        `)
         .order(
           "created_at",
           {
             ascending: false
           }
         )
-        .limit(200);
+        .limit(500);
 
 
     if (error) {
@@ -4611,7 +4029,7 @@ async function loadAuditLogs() {
         : [];
 
 
-    renderAuditLogs();
+    applyAuditFilters();
 
 
   } catch (error) {
@@ -4624,7 +4042,7 @@ async function loadAuditLogs() {
 
     auditLogs = [];
 
-    renderAuditLogs();
+    applyAuditFilters();
 
 
     showToast(
@@ -4639,180 +4057,111 @@ async function loadAuditLogs() {
 
 
 /* =========================================================
-   RENDER AUDIT LOGS
+   AUDIT FILTER
 ========================================================= */
 
-function renderAuditLogs() {
-
-  const tbody =
-    document.getElementById(
-      "auditTableBody"
-    );
-
-
-  if (!tbody) {
-    return;
-  }
-
+function applyAuditFilters() {
 
   const search =
     (
-      document.getElementById(
-        "auditSearch"
-      )?.value || ""
+      auditSearch?.value || ""
     )
       .trim()
       .toLowerCase();
 
 
-  const filtered =
+  const action =
+    auditActionFilter?.value || "all";
+
+
+  filteredAuditLogs =
     auditLogs.filter(
       log => {
 
-        if (!search) {
-          return true;
-        }
+        const searchableText =
+          [
+            log.user_name,
+            log.user_email,
+            log.user_role,
+            log.action,
+            log.entity_type,
+            log.entity_id,
+            log.description
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
 
 
-        const combined = [
-
-          log.user_name,
-
-          log.user_email,
-
-          log.user_role,
-
-          log.action,
-
-          log.entity_type,
-
-          log.entity_id,
-
-          log.description
-
-        ]
-          .map(
-            value =>
-              String(
-                value || ""
-              )
-                .toLowerCase()
-          )
-          .join(" ");
+        const matchesSearch =
+          !search ||
+          searchableText.includes(
+            search
+          );
 
 
-        return combined.includes(
-          search
+        const matchesAction =
+          action === "all" ||
+          log.action === action;
+
+
+        return (
+          matchesSearch &&
+          matchesAction
         );
 
       }
     );
 
 
-  tbody.innerHTML = "";
+  renderAuditLogs();
+
+}
 
 
-  const empty =
-    document.getElementById(
-      "auditEmptyTable"
-    );
+/* =========================================================
+   AUDIT RENDER
+========================================================= */
+
+function renderAuditLogs() {
+
+  if (!auditTableBody) {
+    return;
+  }
 
 
-  if (!filtered.length) {
+  auditTableBody.innerHTML = "";
 
-    empty?.classList.remove(
-      "hidden"
-    );
+
+  if (
+    !filteredAuditLogs.length
+  ) {
+
+    if (auditEmptyState) {
+
+      auditEmptyState.style.display =
+        "block";
+
+    }
 
     return;
 
   }
 
 
-  empty?.classList.add(
-    "hidden"
-  );
+  if (auditEmptyState) {
+
+    auditEmptyState.style.display =
+      "none";
+
+  }
 
 
-  filtered.forEach(
+  filteredAuditLogs.forEach(
     log => {
 
-      const tr =
-        document.createElement("tr");
-
-
-      tr.innerHTML = `
-
-        <td>
-          ${formatDateTime(
-            log.created_at
-          )}
-        </td>
-
-
-        <td>
-
-          <div class="product-table-info">
-
-            <strong>
-              ${escapeHtml(
-                log.user_name ||
-                "Unknown"
-              )}
-            </strong>
-
-            <span>
-              ${escapeHtml(
-                log.user_email ||
-                "-"
-              )}
-            </span>
-
-          </div>
-
-        </td>
-
-
-        <td>
-          ${escapeHtml(
-            log.user_role ||
-            "-"
-          )}
-        </td>
-
-
-        <td>
-
-          <span class="status-badge status-active">
-            ${escapeHtml(
-              log.action ||
-              "-"
-            )}
-          </span>
-
-        </td>
-
-
-        <td>
-          ${escapeHtml(
-            log.entity_type ||
-            "-"
-          )}
-        </td>
-
-
-        <td>
-          ${escapeHtml(
-            log.description ||
-            "-"
-          )}
-        </td>
-
-      `;
-
-
-      tbody.appendChild(
-        tr
+      auditTableBody.appendChild(
+        createAuditRow(log)
       );
 
     }
@@ -4822,24 +4171,186 @@ function renderAuditLogs() {
 
 
 /* =========================================================
-   WRITE AUDIT LOG
+   AUDIT ROW
 ========================================================= */
 
-async function writeAuditLog({
+function createAuditRow(
+  log
+) {
+
+  const tr =
+    document.createElement("tr");
+
+
+  const userName =
+    log.user_name ||
+    log.user_email ||
+    "Unknown User";
+
+
+  const userEmail =
+    log.user_email ||
+    "";
+
+
+  const entity =
+    log.entity_type
+      ? `${log.entity_type}${
+          log.entity_id
+            ? ` #${log.entity_id}`
+            : ""
+        }`
+      : "-";
+
+
+  tr.innerHTML = `
+
+    <td>
+
+      <div class="audit-date">
+        ${escapeHtml(
+          formatDateTime(
+            log.created_at
+          )
+        )}
+      </div>
+
+    </td>
+
+
+    <td>
+
+      <div class="audit-user">
+
+        <strong>
+          ${escapeHtml(
+            userName
+          )}
+        </strong>
+
+        <span>
+          ${escapeHtml(
+            userEmail
+          )}
+        </span>
+
+      </div>
+
+    </td>
+
+
+    <td>
+
+      <span class="activity-badge">
+        ${escapeHtml(
+          log.action ||
+          "-"
+        )}
+      </span>
+
+    </td>
+
+
+    <td>
+
+      ${escapeHtml(
+        entity
+      )}
+
+    </td>
+
+
+    <td>
+
+      <div class="audit-description"
+        title="${escapeAttribute(
+          log.description ||
+          ""
+        )}"
+      >
+        ${escapeHtml(
+          log.description ||
+          "-"
+        )}
+      </div>
+
+    </td>
+
+  `;
+
+
+  return tr;
+
+}
+
+
+/* =========================================================
+   AUDIT CREATE
+========================================================= */
+
+async function createAuditLog(
   action,
   entityType = null,
   entityId = null,
   description = null,
   oldData = null,
   newData = null
-}) {
-
-  if (!currentUser) {
-    return false;
-  }
-
+) {
 
   try {
+
+    const {
+      data: authData
+    } =
+      await supabaseClient.auth.getUser();
+
+
+    const user =
+      authData?.user ||
+      currentUser;
+
+
+    if (!user?.id) {
+
+      console.warn(
+        "Audit skipped: no authenticated user."
+      );
+
+      return false;
+
+    }
+
+
+    let profile =
+      currentOwnerProfile;
+
+
+    if (!profile) {
+
+      const {
+        data
+      } =
+        await supabaseClient
+          .from("staff_profiles")
+          .select(`
+            user_id,
+            full_name,
+            email,
+            role,
+            is_active
+          `)
+          .eq(
+            "user_id",
+            user.id
+          )
+          .maybeSingle();
+
+
+      profile =
+        data || null;
+
+    }
+
 
     const {
       error
@@ -4847,21 +4358,19 @@ async function writeAuditLog({
       await supabaseClient
         .from("audit_logs")
         .insert({
-
           user_id:
-            currentUser.id,
+            user.id,
 
           user_email:
-            currentUser.email ||
-            currentOwnerProfile?.email ||
-            null,
+            user.email || null,
 
           user_name:
-            currentOwnerProfile?.full_name ||
-            "KASHI BHAI Owner",
+            profile?.full_name ||
+            user.email ||
+            "Unknown User",
 
           user_role:
-            currentOwnerProfile?.role ||
+            profile?.role ||
             "owner",
 
           action:
@@ -4881,14 +4390,13 @@ async function writeAuditLog({
 
           new_data:
             newData
-
         });
 
 
     if (error) {
 
-      console.error(
-        "Audit insert error:",
+      console.warn(
+        "Audit log insert failed:",
         error
       );
 
@@ -4901,8 +4409,8 @@ async function writeAuditLog({
 
   } catch (error) {
 
-    console.error(
-      "Audit insert exception:",
+    console.warn(
+      "Audit log exception:",
       error
     );
 
@@ -4989,12 +4497,10 @@ function closeModal(modal) {
     !productModal?.classList.contains(
       "open"
     ) &&
-    !confirmModal?.classList.contains(
+    !staffModal?.classList.contains(
       "open"
     ) &&
-    !document.getElementById(
-      "createStaffModal"
-    )?.classList.contains(
+    !confirmModal?.classList.contains(
       "open"
     )
   ) {
@@ -5082,7 +4588,7 @@ function clearLoginMessage() {
 
 
 /* =========================================================
-   PRODUCT FORM MESSAGES
+   PRODUCT FORM MESSAGE
 ========================================================= */
 
 function showProductFormMessage(
@@ -5123,44 +4629,41 @@ function clearProductFormMessage() {
 
 
 /* =========================================================
-   DYNAMIC MESSAGE
+   STAFF FORM MESSAGE
 ========================================================= */
 
-function showDynamicMessage(
-  element,
+function showStaffFormMessage(
   message,
   type = "info"
 ) {
 
-  if (!element) {
+  if (!staffFormMessage) {
     return;
   }
 
 
-  element.textContent =
+  staffFormMessage.textContent =
     message;
 
 
-  element.className =
+  staffFormMessage.className =
     `form-message ${type}`;
 
 }
 
 
-function clearDynamicMessage(
-  element
-) {
+function clearStaffFormMessage() {
 
-  if (!element) {
+  if (!staffFormMessage) {
     return;
   }
 
 
-  element.textContent =
+  staffFormMessage.textContent =
     "";
 
 
-  element.className =
+  staffFormMessage.className =
     "form-message";
 
 }
@@ -5292,14 +4795,10 @@ function setButtonLoading(
    PRICE
 ========================================================= */
 
-function formatPrice(
-  value
-) {
+function formatPrice(value) {
 
   const number =
-    Number(
-      value || 0
-    );
+    Number(value || 0);
 
 
   return (
@@ -5307,8 +4806,7 @@ function formatPrice(
     number.toLocaleString(
       "en-PK",
       {
-        maximumFractionDigits:
-          2
+        maximumFractionDigits: 2
       }
     )
   );
@@ -5317,7 +4815,42 @@ function formatPrice(
 
 
 /* =========================================================
-   DATE / TIME
+   DATE
+========================================================= */
+
+function formatDate(
+  value
+) {
+
+  if (!value) {
+    return "-";
+  }
+
+
+  try {
+
+    return new Date(
+      value
+    ).toLocaleDateString(
+      "en-PK",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      }
+    );
+
+  } catch (_) {
+
+    return String(value);
+
+  }
+
+}
+
+
+/* =========================================================
+   DATE + TIME
 ========================================================= */
 
 function formatDateTime(
@@ -5325,35 +4858,30 @@ function formatDateTime(
 ) {
 
   if (!value) {
-    return "Never";
-  }
-
-
-  const date =
-    new Date(value);
-
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-
     return "-";
-
   }
 
 
-  return date.toLocaleString(
-    "en-PK",
-    {
-      dateStyle:
-        "medium",
+  try {
 
-      timeStyle:
-        "short"
-    }
-  );
+    return new Date(
+      value
+    ).toLocaleString(
+      "en-PK",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
+
+  } catch (_) {
+
+    return String(value);
+
+  }
 
 }
 
@@ -5367,9 +4895,7 @@ function getFileExtension(
 ) {
 
   const parts =
-    String(
-      filename || ""
-    )
+    String(filename || "")
       .split(".");
 
 
@@ -5426,34 +4952,7 @@ function escapeAttribute(
   value
 ) {
 
-  return escapeHtml(
-    value
-  );
-
-}
-
-
-/* =========================================================
-   SET TEXT
-========================================================= */
-
-function setText(
-  id,
-  value
-) {
-
-  const element =
-    document.getElementById(
-      id
-    );
-
-
-  if (element) {
-
-    element.textContent =
-      value;
-
-  }
+  return escapeHtml(value);
 
 }
 
@@ -5540,7 +5039,7 @@ function getFriendlyError(
   ) {
 
     return (
-      "This record already exists."
+      "This product code or staff account already exists."
     );
 
   }
@@ -5577,25 +5076,15 @@ function getFriendlyError(
 
   if (
     lower.includes(
-      "owner access required"
-    )
-  ) {
-
-    return (
-      "Only the store owner can perform this action."
-    );
-
-  }
-
-
-  if (
+      "failed to send a request"
+    ) ||
     lower.includes(
-      "staff account with this email already exists"
+      "functions"
     )
   ) {
 
     return (
-      "A staff account with this email already exists."
+      "Could not contact the staff creation service. Check the Supabase Edge Function."
     );
 
   }
