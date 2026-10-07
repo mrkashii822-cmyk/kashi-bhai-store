@@ -1,6 +1,7 @@
 /* =========================================================
    KASHI BHAI ADMIN PANEL
    Product Manager + Staff Manager + Activity Log
+   Owner + Staff Authentication
 ========================================================= */
 
 "use strict";
@@ -43,7 +44,12 @@ let currentConfirmAction = null;
 let toastTimer = null;
 
 let currentUser = null;
-let currentOwnerProfile = null;
+let currentUserProfile = null;
+let currentUserRole = null;
+
+let authInitialized = false;
+let handlingAuthUserId = null;
+let loginAuditRecordedFor = null;
 
 
 /* =========================================================
@@ -326,7 +332,7 @@ async function initializeAdmin() {
   try {
 
     supabaseClient.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
 
         console.log(
           "Auth event:",
@@ -334,18 +340,41 @@ async function initializeAdmin() {
         );
 
         if (
-          session &&
-          session.user
+          session?.user
         ) {
 
-          await handleAuthenticatedUser(
-            session.user
+          /*
+            Do not perform heavy Supabase calls
+            directly inside the auth callback.
+          */
+
+          setTimeout(
+            () => {
+
+              handleAuthenticatedUser(
+                session.user,
+                {
+                  auditLogin:
+                    event === "SIGNED_IN"
+                }
+              );
+
+            },
+            0
           );
 
-        } else {
+          return;
+        }
+
+
+        if (
+          event === "SIGNED_OUT"
+        ) {
 
           currentUser = null;
-          currentOwnerProfile = null;
+          currentUserProfile = null;
+          currentUserRole = null;
+          handlingAuthUserId = null;
 
           showLoginScreen();
 
@@ -372,7 +401,11 @@ async function initializeAdmin() {
       showLoginScreen();
 
       return;
+
     }
+
+
+    authInitialized = true;
 
 
     if (
@@ -380,7 +413,10 @@ async function initializeAdmin() {
     ) {
 
       await handleAuthenticatedUser(
-        data.session.user
+        data.session.user,
+        {
+          auditLogin: false
+        }
       );
 
     } else {
@@ -650,7 +686,7 @@ function setupEventListeners() {
   );
 
 
-  /* GLOBAL MODAL PROTECTION */
+  /* GLOBAL MODAL */
 
   document.addEventListener(
     "click",
@@ -662,12 +698,12 @@ function setupEventListeners() {
     "keydown",
     event => {
 
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape"
+      ) {
 
         closeModal(productModal);
-
         closeModal(staffModal);
-
         closeModal(confirmModal);
 
         currentConfirmAction = null;
@@ -681,7 +717,7 @@ function setupEventListeners() {
 
 
 /* =========================================================
-   GLOBAL MODAL CLICK PROTECTION
+   GLOBAL MODAL CLICK
 ========================================================= */
 
 function handleGlobalModalClicks(event) {
@@ -697,6 +733,7 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
+
   }
 
 
@@ -711,6 +748,7 @@ function handleGlobalModalClicks(event) {
     closeModal(productModal);
 
     return;
+
   }
 
 
@@ -725,6 +763,7 @@ function handleGlobalModalClicks(event) {
     closeModal(staffModal);
 
     return;
+
   }
 
 
@@ -739,6 +778,7 @@ function handleGlobalModalClicks(event) {
     closeModal(staffModal);
 
     return;
+
   }
 
 
@@ -782,6 +822,7 @@ async function handleLogin(event) {
     );
 
     return;
+
   }
 
 
@@ -822,15 +863,26 @@ async function handleLogin(event) {
     }
 
 
-    const isAdmin =
-      await verifyAdmin();
+    /*
+      IMPORTANT:
+      We now accept either:
+
+      1. Owner → admin_users
+      2. Staff → staff_profiles
+    */
+
+    const access =
+      await getUserAccess(
+        data.user
+      );
 
 
-    if (!isAdmin) {
+    if (!access.allowed) {
 
       await supabaseClient.auth.signOut();
 
       throw new Error(
+        access.message ||
         "This account does not have admin access."
       );
 
@@ -840,20 +892,27 @@ async function handleLogin(event) {
     currentUser =
       data.user;
 
+    currentUserProfile =
+      access.profile;
+
+    currentUserRole =
+      access.role;
+
 
     await updateCurrentUserLogin();
 
 
-    await createAuditLog(
-      "LOGIN",
-      "auth_user",
-      currentUser.id,
-      `Admin login: ${currentUser.email}`
-    );
+    /*
+      Only record LOGIN once per actual login.
+    */
+
+    await recordLoginAudit();
 
 
     showToast(
-      "Login successful.",
+      currentUserRole === "owner"
+        ? "Owner login successful."
+        : "Staff login successful.",
       "success"
     );
 
@@ -904,7 +963,8 @@ async function handleLogout() {
 
 
     const user =
-      data?.user || currentUser;
+      data?.user ||
+      currentUser;
 
 
     if (user) {
@@ -913,7 +973,11 @@ async function handleLogout() {
         "LOGOUT",
         "auth_user",
         user.id,
-        `Admin logout: ${user.email}`
+        `${
+          currentUserRole === "staff"
+            ? "Staff"
+            : "Owner"
+        } logout: ${user.email}`
       );
 
     }
@@ -932,7 +996,9 @@ async function handleLogout() {
 
 
   currentUser = null;
-  currentOwnerProfile = null;
+  currentUserProfile = null;
+  currentUserRole = null;
+  handlingAuthUserId = null;
 
   showLoginScreen();
 
@@ -940,43 +1006,223 @@ async function handleLogout() {
 
 
 /* =========================================================
-   ADMIN CHECK
+   USER ACCESS CHECK
 ========================================================= */
 
-async function verifyAdmin() {
+async function getUserAccess(user) {
+
+  if (!user?.id) {
+
+    return {
+      allowed: false,
+      role: null,
+      profile: null,
+      message:
+        "Unable to identify the logged-in account."
+    };
+
+  }
+
+
+  /*
+    STEP 1:
+    Check existing admin_users table.
+
+    This is the Owner path.
+  */
 
   try {
 
     const {
-      data,
-      error
+      data: ownerRow,
+      error: ownerError
     } =
-      await supabaseClient.rpc(
-        "is_admin"
-      );
+      await supabaseClient
+        .from("admin_users")
+        .select("user_id")
+        .eq(
+          "user_id",
+          user.id
+        )
+        .maybeSingle();
 
 
-    if (error) {
+    if (
+      !ownerError &&
+      ownerRow
+    ) {
+
+      /*
+        Owner profile is useful for
+        audit/login information.
+      */
+
+      let profile = null;
+
+
+      try {
+
+        const {
+          data
+        } =
+          await supabaseClient
+            .from("staff_profiles")
+            .select(`
+              user_id,
+              full_name,
+              email,
+              role,
+              is_active,
+              created_at,
+              last_login_at
+            `)
+            .eq(
+              "user_id",
+              user.id
+            )
+            .maybeSingle();
+
+
+        profile =
+          data || null;
+
+      } catch (_) {
+        /* Owner can continue even if profile read fails */
+      }
+
+
+      return {
+        allowed: true,
+        role: "owner",
+        profile
+      };
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Owner table check failed:",
+      error
+    );
+
+  }
+
+
+  /*
+    STEP 2:
+    Check staff_profiles.
+
+    A staff account must:
+      role = staff
+      is_active = true
+  */
+
+  try {
+
+    const {
+      data: staffRow,
+      error: staffError
+    } =
+      await supabaseClient
+        .from("staff_profiles")
+        .select(`
+          user_id,
+          full_name,
+          email,
+          role,
+          is_active,
+          created_at,
+          last_login_at
+        `)
+        .eq(
+          "user_id",
+          user.id
+        )
+        .maybeSingle();
+
+
+    if (staffError) {
 
       console.error(
-        "Admin verification error:",
-        error
+        "Staff access check error:",
+        staffError
       );
 
-      return false;
+      return {
+        allowed: false,
+        role: null,
+        profile: null,
+        message:
+          "Unable to verify staff permissions."
+      };
+
     }
 
 
-    return data === true;
+    if (!staffRow) {
+
+      return {
+        allowed: false,
+        role: null,
+        profile: null,
+        message:
+          "This account does not have admin access."
+      };
+
+    }
+
+
+    if (
+      staffRow.role !== "staff"
+    ) {
+
+      return {
+        allowed: false,
+        role: null,
+        profile: staffRow,
+        message:
+          "This account has an invalid staff role."
+      };
+
+    }
+
+
+    if (
+      staffRow.is_active !== true
+    ) {
+
+      return {
+        allowed: false,
+        role: null,
+        profile: staffRow,
+        message:
+          "This staff account has been disabled."
+      };
+
+    }
+
+
+    return {
+      allowed: true,
+      role: "staff",
+      profile: staffRow
+    };
 
   } catch (error) {
 
     console.error(
-      "Admin verification exception:",
+      "Staff access exception:",
       error
     );
 
-    return false;
+    return {
+      allowed: false,
+      role: null,
+      profile: null,
+      message:
+        "Unable to verify staff permissions."
+    };
 
   }
 
@@ -984,55 +1230,165 @@ async function verifyAdmin() {
 
 
 /* =========================================================
-   AUTH USER
+   AUTHENTICATED USER
 ========================================================= */
 
-async function handleAuthenticatedUser(user) {
+async function handleAuthenticatedUser(
+  user,
+  options = {}
+) {
 
   if (!user) {
 
     showLoginScreen();
 
     return;
+
   }
 
 
-  const isAdmin =
-    await verifyAdmin();
+  /*
+    Prevent duplicate INITIAL_SESSION /
+    getSession processing.
+  */
 
-
-  if (!isAdmin) {
-
-    console.warn(
-      "Authenticated user is not an admin."
-    );
-
-
-    await supabaseClient.auth.signOut();
-
-
-    showLoginScreen();
-
-
-    showLoginMessage(
-      "This account does not have admin access.",
-      "error"
-    );
-
+  if (
+    handlingAuthUserId === user.id &&
+    adminApp &&
+    !adminApp.classList.contains("hidden")
+  ) {
 
     return;
 
   }
 
 
-  currentUser =
-    user;
+  handlingAuthUserId =
+    user.id;
 
 
-  await updateCurrentUserLogin();
+  try {
+
+    const access =
+      await getUserAccess(
+        user
+      );
 
 
-  await showAdminApp();
+    if (!access.allowed) {
+
+      console.warn(
+        "Authenticated account rejected:",
+        access.message
+      );
+
+
+      await supabaseClient.auth.signOut();
+
+
+      currentUser = null;
+      currentUserProfile = null;
+      currentUserRole = null;
+
+
+      showLoginScreen();
+
+
+      showLoginMessage(
+        access.message ||
+        "This account does not have admin access.",
+        "error"
+      );
+
+
+      return;
+
+    }
+
+
+    currentUser =
+      user;
+
+    currentUserProfile =
+      access.profile;
+
+    currentUserRole =
+      access.role;
+
+
+    await updateCurrentUserLogin();
+
+
+    /*
+      Existing session on page refresh:
+      do NOT create another LOGIN audit.
+
+      Real SIGNED_IN event:
+      create LOGIN audit.
+    */
+
+    if (
+      options.auditLogin === true
+    ) {
+
+      await recordLoginAudit();
+
+    }
+
+
+    await showAdminApp();
+
+  } finally {
+
+    /*
+      Keep ID while app is active so
+      INITIAL_SESSION doesn't reload everything.
+    */
+
+  }
+
+}
+
+
+/* =========================================================
+   LOGIN AUDIT
+========================================================= */
+
+async function recordLoginAudit() {
+
+  if (!currentUser?.id) {
+    return;
+  }
+
+
+  /*
+    Prevent duplicate login records.
+  */
+
+  if (
+    loginAuditRecordedFor ===
+    currentUser.id
+  ) {
+
+    return;
+
+  }
+
+
+  loginAuditRecordedFor =
+    currentUser.id;
+
+
+  await createAuditLog(
+    "LOGIN",
+    "auth_user",
+    currentUser.id,
+    `${
+      currentUserRole === "owner"
+        ? "Owner"
+        : "Staff"
+    } login: ${currentUser.email}`
+  );
 
 }
 
@@ -1085,7 +1441,7 @@ async function updateCurrentUserLogin() {
 
     if (data) {
 
-      currentOwnerProfile =
+      currentUserProfile =
         data;
 
     }
@@ -1109,9 +1465,7 @@ async function updateCurrentUserLogin() {
 function showLoginScreen() {
 
   forceCloseModal(productModal);
-
   forceCloseModal(staffModal);
-
   forceCloseModal(confirmModal);
 
   currentConfirmAction = null;
@@ -1121,26 +1475,36 @@ function showLoginScreen() {
 
   if (loginScreen) {
 
-    loginScreen.classList.remove("hidden");
+    loginScreen.classList.remove(
+      "hidden"
+    );
 
-    loginScreen.style.display = "flex";
+    loginScreen.style.display =
+      "flex";
 
-    loginScreen.style.visibility = "visible";
+    loginScreen.style.visibility =
+      "visible";
 
-    loginScreen.style.opacity = "1";
+    loginScreen.style.opacity =
+      "1";
 
-    loginScreen.style.filter = "none";
+    loginScreen.style.filter =
+      "none";
 
-    loginScreen.style.pointerEvents = "auto";
+    loginScreen.style.pointerEvents =
+      "auto";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.add("hidden");
+    adminApp.classList.add(
+      "hidden"
+    );
 
-    adminApp.style.display = "none";
+    adminApp.style.display =
+      "none";
 
   }
 
@@ -1158,41 +1522,121 @@ function showLoginScreen() {
 
 
 /* =========================================================
-   SHOW ADMIN
+   SHOW ADMIN APP
 ========================================================= */
 
 async function showAdminApp() {
 
   forceCloseModal(productModal);
-
   forceCloseModal(staffModal);
-
   forceCloseModal(confirmModal);
 
 
   if (loginScreen) {
 
-    loginScreen.classList.add("hidden");
+    loginScreen.classList.add(
+      "hidden"
+    );
 
-    loginScreen.style.display = "none";
+    loginScreen.style.display =
+      "none";
 
   }
 
 
   if (adminApp) {
 
-    adminApp.classList.remove("hidden");
+    adminApp.classList.remove(
+      "hidden"
+    );
 
-    adminApp.style.display = "block";
+    adminApp.style.display =
+      "block";
 
   }
 
 
+  /*
+    Owner-only sections.
+  */
+
+  applyRoleBasedUI();
+
+
+  /*
+    Product Manager is available
+    to authenticated owner/staff.
+
+    Note:
+    Product write permissions must also
+    exist in Supabase RLS for staff.
+  */
+
   await loadProducts();
 
-  await loadStaffProfiles();
 
-  await loadAuditLogs();
+  /*
+    Only Owner loads staff manager
+    and activity log.
+  */
+
+  if (
+    currentUserRole === "owner"
+  ) {
+
+    await loadStaffProfiles();
+
+    await loadAuditLogs();
+
+  }
+
+}
+
+
+/* =========================================================
+   ROLE BASED UI
+========================================================= */
+
+function applyRoleBasedUI() {
+
+  const isOwner =
+    currentUserRole === "owner";
+
+
+  /*
+    Staff Management
+  */
+
+  if (staffManagementSection) {
+
+    staffManagementSection.style.display =
+      isOwner
+        ? ""
+        : "none";
+
+  }
+
+
+  /*
+    Hide staff controls for non-owner
+    even if section exists elsewhere.
+  */
+
+  if (!isOwner) {
+
+    if (addStaffButton) {
+      addStaffButton.style.display = "none";
+    }
+
+    if (refreshStaffButton) {
+      refreshStaffButton.style.display = "none";
+    }
+
+    if (refreshAuditButton) {
+      refreshAuditButton.style.display = "none";
+    }
+
+  }
 
 }
 
@@ -1344,7 +1788,9 @@ function getProductImageUrl(
     supabaseClient
       .storage
       .from(STORAGE_BUCKET)
-      .getPublicUrl(cleanPath);
+      .getPublicUrl(
+        cleanPath
+      );
 
 
   return data?.publicUrl || null;
@@ -1869,7 +2315,6 @@ function openAddProductModal() {
 
   clearProductFormMessage();
 
-
   openModal(productModal);
 
 }
@@ -2027,7 +2472,6 @@ function openEditProductModal(
 
   clearProductFormMessage();
 
-
   openModal(productModal);
 
 }
@@ -2043,51 +2487,41 @@ async function handleProductSubmit(
 
   event.preventDefault();
 
-
   clearProductFormMessage();
 
 
   const productId =
     editingProductId?.value || "";
 
-
   const code =
     productCode?.value.trim() || "";
 
-
   const name =
     productName?.value.trim() || "";
-
 
   const price =
     Number(
       productPrice?.value
     );
 
-
   const oldPriceRaw =
     productOldPrice?.value.trim() || "";
-
 
   const oldPrice =
     oldPriceRaw === ""
       ? null
       : Number(oldPriceRaw);
 
-
   const stock =
     Number(
       productStock?.value
     );
 
-
   const category =
     productCategory?.value.trim() || "";
 
-
   const description =
     productDescription?.value.trim() || "";
-
 
   const isActive =
     productActive?.checked !== false;
@@ -2229,8 +2663,6 @@ async function handleProductSubmit(
     };
 
 
-    /* UPDATE */
-
     if (productId) {
 
       const oldProduct =
@@ -2285,12 +2717,7 @@ async function handleProductSubmit(
         "success"
       );
 
-
-    }
-
-    /* INSERT */
-
-    else {
+    } else {
 
       const {
         data,
@@ -2341,10 +2768,15 @@ async function handleProductSubmit(
 
     closeModal(productModal);
 
-
     await loadProducts(true);
 
-    await loadAuditLogs();
+    if (
+      currentUserRole === "owner"
+    ) {
+
+      await loadAuditLogs();
+
+    }
 
 
   } catch (error) {
@@ -2592,7 +3024,7 @@ function getExistingProductImage(
 
 
 /* =========================================================
-   HIDE / REACTIVATE
+   PRODUCT CONFIRM
 ========================================================= */
 
 function askProductAction(
@@ -2601,9 +3033,9 @@ function askProductAction(
 ) {
 
   currentConfirmAction = {
+    type: "product",
     productId:
       product.id,
-
     action:
       action
   };
@@ -2676,217 +3108,21 @@ function askProductAction(
 
 
 /* =========================================================
-   EXECUTE HIDE / REACTIVATE
-========================================================= */
-
-async function executeConfirmAction() {
-
-  if (!currentConfirmAction) {
-    return;
-  }
-
-
-  const {
-    productId,
-    action
-  } =
-    currentConfirmAction;
-
-
-  setButtonLoading(
-    confirmActionButton,
-    null,
-    true,
-    action === "hide"
-      ? "Hiding..."
-      : "Activating..."
-  );
-
-
-  try {
-
-    const oldProduct =
-      products.find(
-        item =>
-          String(item.id) ===
-          String(productId)
-      );
-
-
-    const isActive =
-      action !== "hide";
-
-
-    const {
-      data,
-      error
-    } =
-      await supabaseClient
-        .from("products")
-        .update({
-          is_active:
-            isActive,
-
-          updated_at:
-            new Date().toISOString()
-        })
-        .eq(
-          "id",
-          productId
-        )
-        .select()
-        .single();
-
-
-    if (error) {
-      throw error;
-    }
-
-
-    if (!data) {
-
-      throw new Error(
-        "Product status could not be changed."
-      );
-
-    }
-
-
-    await createAuditLog(
-      action === "hide"
-        ? "HIDE_PRODUCT"
-        : "REACTIVATE_PRODUCT",
-      "product",
-      String(productId),
-      action === "hide"
-        ? `Hidden product ${data.product_code} — ${data.name}`
-        : `Reactivated product ${data.product_code} — ${data.name}`,
-      oldProduct || null,
-      data
-    );
-
-
-    closeModal(confirmModal);
-
-
-    showToast(
-      action === "hide"
-        ? "Product hidden successfully."
-        : "Product reactivated successfully.",
-      "success"
-    );
-
-
-    currentConfirmAction = null;
-
-
-    await loadProducts(true);
-
-    await loadAuditLogs();
-
-
-  } catch (error) {
-
-    console.error(
-      "Product status error:",
-      error
-    );
-
-
-    showToast(
-      getFriendlyError(error),
-      "error"
-    );
-
-
-  } finally {
-
-    setButtonLoading(
-      confirmActionButton,
-      null,
-      false,
-      "Confirm"
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   PRODUCT STATS
-========================================================= */
-
-function updateStats() {
-
-  const total =
-    products.length;
-
-
-  const active =
-    products.filter(
-      product =>
-        product.is_active === true
-    ).length;
-
-
-  const hidden =
-    products.filter(
-      product =>
-        product.is_active === false
-    ).length;
-
-
-  const outOfStock =
-    products.filter(
-      product =>
-        Number(
-          product.stock || 0
-        ) <= 0
-    ).length;
-
-
-  if (totalProducts) {
-
-    totalProducts.textContent =
-      total;
-
-  }
-
-
-  if (activeProducts) {
-
-    activeProducts.textContent =
-      active;
-
-  }
-
-
-  if (hiddenProducts) {
-
-    hiddenProducts.textContent =
-      hidden;
-
-  }
-
-
-  if (outOfStockProducts) {
-
-    outOfStockProducts.textContent =
-      outOfStock;
-
-  }
-
-}
-
-
-/* =========================================================
    STAFF MANAGEMENT
 ========================================================= */
 
 async function loadStaffProfiles(
   showLoading = false
 ) {
+
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    return;
+
+  }
+
 
   if (showLoading) {
 
@@ -2995,26 +3231,17 @@ function updateStaffStats() {
 
 
   if (totalStaff) {
-
-    totalStaff.textContent =
-      total;
-
+    totalStaff.textContent = total;
   }
 
 
   if (activeStaff) {
-
-    activeStaff.textContent =
-      active;
-
+    activeStaff.textContent = active;
   }
 
 
   if (disabledStaff) {
-
-    disabledStaff.textContent =
-      disabled;
-
+    disabledStaff.textContent = disabled;
   }
 
 }
@@ -3041,8 +3268,6 @@ function applyStaffFilters() {
   filteredStaffProfiles =
     staffProfiles.filter(
       profile => {
-
-        /* Owner is shown in data but not in staff list */
 
         if (
           profile.role !== "staff"
@@ -3295,6 +3520,15 @@ function handleStaffTableClick(
   event
 ) {
 
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    return;
+
+  }
+
+
   const button =
     event.target.closest(
       "[data-staff-action]"
@@ -3326,6 +3560,20 @@ function handleStaffTableClick(
 
     showToast(
       "Staff account could not be found.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
+    profile.role !== "staff"
+  ) {
+
+    showToast(
+      "Owner accounts cannot be changed here.",
       "error"
     );
 
@@ -3370,6 +3618,15 @@ function askStaffAction(
   profile,
   enable
 ) {
+
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    return;
+
+  }
+
 
   currentConfirmAction = {
     type: "staff",
@@ -3438,6 +3695,20 @@ function askStaffAction(
 
 function openStaffModal() {
 
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    showToast(
+      "Only the owner can create staff accounts.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
   if (staffForm) {
 
     staffForm.reset();
@@ -3446,7 +3717,6 @@ function openStaffModal() {
 
 
   clearStaffFormMessage();
-
 
   openModal(staffModal);
 
@@ -3472,6 +3742,20 @@ async function handleCreateStaff(
 ) {
 
   event.preventDefault();
+
+
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    showStaffFormMessage(
+      "Only the owner can create staff accounts.",
+      "error"
+    );
+
+    return;
+
+  }
 
 
   clearStaffFormMessage();
@@ -3518,6 +3802,20 @@ async function handleCreateStaff(
 
 
   if (
+    !isValidEmail(email)
+  ) {
+
+    showStaffFormMessage(
+      "Please enter a valid email address.",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (
     password.length < 8
   ) {
 
@@ -3555,13 +3853,6 @@ async function handleCreateStaff(
 
   try {
 
-    /*
-      IMPORTANT:
-      No service_role key is used here.
-      Staff account creation happens
-      through the Supabase Edge Function.
-    */
-
     const {
       data,
       error
@@ -3598,9 +3889,7 @@ async function handleCreateStaff(
             responseBody?.message ||
             detail;
 
-        } catch (_) {
-          /* Ignore invalid error body */
-        }
+        } catch (_) {}
 
       }
 
@@ -3665,7 +3954,7 @@ async function handleCreateStaff(
 
 
 /* =========================================================
-   EXECUTE CONFIRM ACTION
+   CONFIRM ACTION
 ========================================================= */
 
 async function executeConfirmAction() {
@@ -3674,8 +3963,6 @@ async function executeConfirmAction() {
     return;
   }
 
-
-  /* STAFF ACTION */
 
   if (
     currentConfirmAction.type ===
@@ -3689,18 +3976,29 @@ async function executeConfirmAction() {
   }
 
 
-  /* PRODUCT ACTION */
-
   await executeProductConfirmAction();
 
 }
 
 
 /* =========================================================
-   EXECUTE STAFF STATUS CHANGE
+   STAFF STATUS CHANGE
 ========================================================= */
 
 async function executeStaffStatusChange() {
+
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    closeModal(confirmModal);
+
+    currentConfirmAction = null;
+
+    return;
+
+  }
+
 
   const {
     userId,
@@ -3733,6 +4031,17 @@ async function executeStaffStatusChange() {
 
       throw new Error(
         "Staff profile could not be found."
+      );
+
+    }
+
+
+    if (
+      profile.role !== "staff"
+    ) {
+
+      throw new Error(
+        "Owner account cannot be disabled here."
       );
 
     }
@@ -3792,7 +4101,6 @@ async function executeStaffStatusChange() {
 
     closeModal(confirmModal);
 
-
     currentConfirmAction = null;
 
 
@@ -3837,7 +4145,7 @@ async function executeStaffStatusChange() {
 
 
 /* =========================================================
-   EXECUTE PRODUCT CONFIRM ACTION
+   PRODUCT STATUS CONFIRM
 ========================================================= */
 
 async function executeProductConfirmAction() {
@@ -3924,6 +4232,8 @@ async function executeProductConfirmAction() {
 
     closeModal(confirmModal);
 
+    currentConfirmAction = null;
+
 
     showToast(
       action === "hide"
@@ -3933,12 +4243,16 @@ async function executeProductConfirmAction() {
     );
 
 
-    currentConfirmAction = null;
-
-
     await loadProducts(true);
 
-    await loadAuditLogs();
+
+    if (
+      currentUserRole === "owner"
+    ) {
+
+      await loadAuditLogs();
+
+    }
 
 
   } catch (error) {
@@ -3976,6 +4290,15 @@ async function executeProductConfirmAction() {
 async function loadAuditLogs(
   showLoading = false
 ) {
+
+  if (
+    currentUserRole !== "owner"
+  ) {
+
+    return;
+
+  }
+
 
   if (showLoading) {
 
@@ -4015,7 +4338,7 @@ async function loadAuditLogs(
             ascending: false
           }
         )
-        .limit(500);
+        .limit(100);
 
 
     if (error) {
@@ -4028,6 +4351,8 @@ async function loadAuditLogs(
         ? data
         : [];
 
+
+    populateAuditActionFilter();
 
     applyAuditFilters();
 
@@ -4050,6 +4375,83 @@ async function loadAuditLogs(
       getFriendlyError(error),
       "error"
     );
+
+  }
+
+}
+
+
+/* =========================================================
+   AUDIT ACTION FILTER OPTIONS
+========================================================= */
+
+function populateAuditActionFilter() {
+
+  if (!auditActionFilter) {
+    return;
+  }
+
+
+  const currentValue =
+    auditActionFilter.value || "all";
+
+
+  const actions =
+    [
+      ...new Set(
+        auditLogs
+          .map(
+            log =>
+              log.action
+          )
+          .filter(Boolean)
+      )
+    ]
+      .sort();
+
+
+  auditActionFilter.innerHTML = `
+    <option value="all">
+      All Actions
+    </option>
+  `;
+
+
+  actions.forEach(
+    action => {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        action;
+
+      option.textContent =
+        action;
+
+      auditActionFilter.appendChild(
+        option
+      );
+
+    }
+  );
+
+
+  if (
+    actions.includes(
+      currentValue
+    )
+  ) {
+
+    auditActionFilter.value =
+      currentValue;
+
+  } else {
+
+    auditActionFilter.value =
+      "all";
 
   }
 
@@ -4262,7 +4664,8 @@ function createAuditRow(
 
     <td>
 
-      <div class="audit-description"
+      <div
+        class="audit-description"
         title="${escapeAttribute(
           log.description ||
           ""
@@ -4322,10 +4725,12 @@ async function createAuditLog(
 
 
     let profile =
-      currentOwnerProfile;
+      currentUserProfile;
 
 
-    if (!profile) {
+    if (
+      !profile
+    ) {
 
       const {
         data
@@ -4370,6 +4775,7 @@ async function createAuditLog(
             "Unknown User",
 
           user_role:
+            currentUserRole ||
             profile?.role ||
             "owner",
 
@@ -4380,7 +4786,9 @@ async function createAuditLog(
             entityType,
 
           entity_id:
-            entityId,
+            entityId == null
+              ? null
+              : String(entityId),
 
           description:
             description,
@@ -4547,7 +4955,7 @@ function forceCloseModal(modal) {
 
 
 /* =========================================================
-   LOGIN MESSAGES
+   MESSAGES
 ========================================================= */
 
 function showLoginMessage(
@@ -4587,10 +4995,6 @@ function clearLoginMessage() {
 }
 
 
-/* =========================================================
-   PRODUCT FORM MESSAGE
-========================================================= */
-
 function showProductFormMessage(
   message,
   type = "info"
@@ -4627,10 +5031,6 @@ function clearProductFormMessage() {
 
 }
 
-
-/* =========================================================
-   STAFF FORM MESSAGE
-========================================================= */
 
 function showStaffFormMessage(
   message,
@@ -4787,6 +5187,22 @@ function setButtonLoading(
     loading
       ? text
       : button.dataset.originalText;
+
+}
+
+
+/* =========================================================
+   VALIDATE EMAIL
+========================================================= */
+
+function isValidEmail(
+  email
+) {
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    .test(
+      String(email || "")
+    );
 
 }
 
@@ -5018,6 +5434,22 @@ function getFriendlyError(
 
   if (
     lower.includes(
+      "disabled"
+    ) &&
+    lower.includes(
+      "staff"
+    )
+  ) {
+
+    return (
+      "This staff account has been disabled."
+    );
+
+  }
+
+
+  if (
+    lower.includes(
       "row-level security"
     ) ||
     lower.includes(
@@ -5026,7 +5458,7 @@ function getFriendlyError(
   ) {
 
     return (
-      "Permission denied. Admin RLS policy is blocking this action."
+      "Permission denied. Supabase RLS policy is blocking this action."
     );
 
   }
