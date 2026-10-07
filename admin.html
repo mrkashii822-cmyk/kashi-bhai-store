@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,127 +8,76 @@
     content="width=device-width, initial-scale=1.0"
   >
 
-  <meta
-    name="description"
-    content="KASHI BHAI secure admin panel"
-  >
-
   <title>KASHI BHAI — Admin Panel</title>
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="admin.css?v=20261007-1">
 
-  <!-- Admin CSS -->
-  <link rel="stylesheet" href="admin.css?v=999">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
-  <!-- =====================================================
+  <!-- =========================
        LOGIN SCREEN
-       ===================================================== -->
+  ========================== -->
 
-  <section
-    id="loginScreen"
-    class="login-screen"
-  >
+  <section id="loginScreen" class="login-screen">
 
     <div class="login-card">
 
-      <!-- BRAND -->
       <div class="login-brand">
-
-        <img
-          src="images/logo.jpg"
-          alt="KASHI BHAI Logo"
-        >
+        <div class="brand-logo">K</div>
 
         <div>
-          <strong>KASHI BHAI</strong>
-          <span>Admin Panel</span>
+          <h1>KASHI BHAI</h1>
+          <span>ADMIN PANEL</span>
         </div>
-
       </div>
 
-
-      <!-- LOGIN HEADING -->
       <div class="login-heading">
-
-        <span class="eyebrow">
-          SECURE ACCESS
-        </span>
-
-        <h1>
-          Admin Login
-        </h1>
-
-        <p>
-          Sign in with your authorized KASHI BHAI admin account.
-        </p>
-
+        <h2>Welcome Back</h2>
+        <p>Sign in to manage your store.</p>
       </div>
 
-
-      <!-- LOGIN FORM -->
       <form id="loginForm">
 
-        <label class="form-field">
-
-          <span>
-            Email Address
-          </span>
+        <div class="form-field">
+          <label for="loginEmail">Email</label>
 
           <input
-            id="loginEmail"
             type="email"
+            id="loginEmail"
             placeholder="Enter admin email"
-            autocomplete="username"
+            autocomplete="email"
             required
           >
+        </div>
 
-        </label>
-
-
-        <label class="form-field">
-
-          <span>
-            Password
-          </span>
+        <div class="form-field">
+          <label for="loginPassword">Password</label>
 
           <input
-            id="loginPassword"
             type="password"
+            id="loginPassword"
             placeholder="Enter password"
             autocomplete="current-password"
             required
           >
+        </div>
 
-        </label>
-
+        <div id="loginMessage" class="form-message"></div>
 
         <button
-          id="loginButton"
           type="submit"
-          class="primary-btn full-btn"
+          id="loginButton"
+          class="full-btn primary-btn"
         >
-          Login
+          <span id="loginButtonText">Login</span>
         </button>
-
-
-        <div
-          id="loginMessage"
-          class="form-message"
-          aria-live="polite"
-        ></div>
 
       </form>
 
-
-      <!-- BACK TO STORE -->
-      <a
-        href="index.html"
-        class="back-link"
-      >
+      <a href="index.html" class="back-link">
         ← Back to Store
       </a>
 
@@ -138,52 +86,42 @@
   </section>
 
 
-  <!-- =====================================================
-       ADMIN APPLICATION
-       ===================================================== -->
+  <!-- =========================
+       ADMIN APP
+  ========================== -->
 
-  <section
-    id="adminApp"
-    class="admin-app hidden"
-  >
+  <main id="adminApp" class="admin-app hidden">
 
-    <!-- ===================================================
-         HEADER
-         =================================================== -->
+    <!-- HEADER -->
 
     <header class="admin-header">
 
       <div class="admin-header-inner">
 
-        <!-- BRAND -->
         <div class="admin-brand">
 
-          <img
-            src="images/logo.jpg"
-            alt="KASHI BHAI Logo"
-          >
+          <div class="brand-logo small">K</div>
 
           <div>
             <strong>KASHI BHAI</strong>
-            <span>Admin Dashboard</span>
+            <span>ADMIN PANEL</span>
           </div>
 
         </div>
 
-
-        <!-- HEADER ACTIONS -->
         <div class="admin-header-actions">
 
           <a
             href="index.html"
             class="header-link"
+            target="_blank"
           >
             View Store
           </a>
 
           <button
-            id="logoutButton"
             type="button"
+            id="logoutButton"
             class="logout-btn"
           >
             Logout
@@ -196,39 +134,28 @@
     </header>
 
 
-    <!-- ===================================================
-         MAIN
-         =================================================== -->
+    <!-- MAIN -->
 
-    <main class="admin-main">
+    <section class="admin-main">
 
       <div class="admin-container">
 
-
         <!-- PAGE HEADING -->
+
         <div class="admin-page-heading">
 
           <div>
-
-            <span class="eyebrow">
-              STORE MANAGEMENT
-            </span>
-
-            <h1>
-              Products
-            </h1>
-
+            <p class="eyebrow">STORE MANAGEMENT</p>
+            <h1>Products</h1>
             <p>
-              Add, edit, hide and manage products from one place.
+              Add, edit, hide and manage your store products.
             </p>
-
           </div>
 
-
           <button
-            id="addProductButton"
             type="button"
-            class="primary-btn"
+            id="addProductButton"
+            class="primary-btn add-product-btn"
           >
             + Add Product
           </button>
@@ -236,113 +163,74 @@
         </div>
 
 
-        <!-- =================================================
-             STATS
-             ================================================= -->
+        <!-- STATS -->
 
-        <section class="admin-stats">
+        <div class="admin-stats">
 
           <div class="stat-card">
-
-            <span>
-              Total Products
-            </span>
-
-            <strong id="totalProducts">
-              0
-            </strong>
-
+            <div class="stat-icon">P</div>
+            <div>
+              <span>Total Products</span>
+              <strong id="totalProducts">0</strong>
+            </div>
           </div>
-
 
           <div class="stat-card">
-
-            <span>
-              Active Products
-            </span>
-
-            <strong id="activeProducts">
-              0
-            </strong>
-
+            <div class="stat-icon">A</div>
+            <div>
+              <span>Active Products</span>
+              <strong id="activeProducts">0</strong>
+            </div>
           </div>
-
 
           <div class="stat-card">
-
-            <span>
-              Hidden Products
-            </span>
-
-            <strong id="hiddenProducts">
-              0
-            </strong>
-
+            <div class="stat-icon">H</div>
+            <div>
+              <span>Hidden Products</span>
+              <strong id="hiddenProducts">0</strong>
+            </div>
           </div>
-
 
           <div class="stat-card">
-
-            <span>
-              Out of Stock
-            </span>
-
-            <strong id="outOfStockProducts">
-              0
-            </strong>
-
+            <div class="stat-icon">O</div>
+            <div>
+              <span>Out of Stock</span>
+              <strong id="outOfStockProducts">0</strong>
+            </div>
           </div>
 
-        </section>
+        </div>
 
 
-        <!-- =================================================
-             TOOLBAR
-             ================================================= -->
+        <!-- TOOLBAR -->
 
         <div class="admin-toolbar">
 
-          <div class="admin-search">
+          <div class="search-box">
 
-            <span>
-              🔎
-            </span>
+            <span class="search-icon">⌕</span>
 
             <input
-              id="adminSearch"
               type="search"
+              id="adminSearch"
               placeholder="Search products..."
               autocomplete="off"
             >
 
           </div>
 
+          <select id="adminStatusFilter" class="admin-select">
 
-          <select
-            id="adminStatusFilter"
-            class="admin-select"
-          >
-            <option value="all">
-              All Products
-            </option>
+            <option value="all">All Products</option>
+            <option value="active">Active</option>
+            <option value="hidden">Hidden</option>
+            <option value="out_of_stock">Out of Stock</option>
 
-            <option value="active">
-              Active
-            </option>
-
-            <option value="hidden">
-              Hidden
-            </option>
-
-            <option value="out">
-              Out of Stock
-            </option>
           </select>
 
-
           <button
-            id="refreshProductsButton"
             type="button"
+            id="refreshProductsButton"
             class="secondary-btn"
           >
             ↻ Refresh
@@ -350,30 +238,19 @@
 
         </div>
 
-
-        <!-- STATUS -->
-        <div
-          id="adminStatus"
-          class="admin-status"
-          aria-live="polite"
-        ></div>
+        <div id="adminStatus" class="admin-status"></div>
 
 
-        <!-- =================================================
-             PRODUCTS PANEL
-             ================================================= -->
+        <!-- PRODUCTS -->
 
         <section class="products-panel">
 
-          <div class="panel-heading">
+          <div class="products-panel-header">
 
-            <span class="eyebrow">
-              PRODUCT CATALOG
-            </span>
-
-            <h2>
-              All Products
-            </h2>
+            <div>
+              <h2>Product List</h2>
+              <p>Manage products shown on your online store.</p>
+            </div>
 
           </div>
 
@@ -385,78 +262,29 @@
               <thead>
 
                 <tr>
-
-                  <th>
-                    Image
-                  </th>
-
-                  <th>
-                    Product
-                  </th>
-
-                  <th>
-                    Code
-                  </th>
-
-                  <th>
-                    Price
-                  </th>
-
-                  <th>
-                    Stock
-                  </th>
-
-                  <th>
-                    Category
-                  </th>
-
-                  <th>
-                    Status
-                  </th>
-
-                  <th>
-                    Actions
-                  </th>
-
+                  <th>Product</th>
+                  <th>Code</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
 
               </thead>
 
-
               <tbody id="productsTableBody">
-
-                <tr>
-
-                  <td
-                    colspan="8"
-                    class="table-loading"
-                  >
-                    Loading products...
-                  </td>
-
-                </tr>
-
               </tbody>
 
             </table>
 
+            <div id="emptyTable" class="empty-table hidden">
 
-            <!-- EMPTY STATE -->
-            <div
-              id="emptyTable"
-              class="table-empty hidden"
-            >
+              <div class="empty-icon">📦</div>
 
-              <div class="empty-symbol">
-                📦
-              </div>
-
-              <h3>
-                No Products Found
-              </h3>
+              <h3>No products found</h3>
 
               <p>
-                Try changing your search or filter.
+                Add your first product or change your search/filter.
               </p>
 
             </div>
@@ -467,50 +295,47 @@
 
       </div>
 
-    </main>
+    </section>
 
-  </section>
+  </main>
 
 
-  <!-- =====================================================
+  <!-- =========================
        PRODUCT MODAL
-       ===================================================== -->
+  ========================== -->
 
   <div
     id="productModal"
     class="modal"
     aria-hidden="true"
+    style="display:none;"
   >
 
-    <div class="modal-overlay"></div>
-
+    <div
+      class="modal-overlay"
+      id="productModalOverlay"
+    ></div>
 
     <div
-      class="modal-content product-modal-content"
+      class="modal-content"
       role="dialog"
       aria-modal="true"
       aria-labelledby="productModalTitle"
     >
 
-      <!-- MODAL HEADER -->
       <div class="modal-header">
 
         <div>
-
-          <span class="eyebrow">
-            PRODUCT MANAGEMENT
-          </span>
+          <p class="eyebrow">PRODUCT MANAGEMENT</p>
 
           <h2 id="productModalTitle">
             Add Product
           </h2>
-
         </div>
 
-
         <button
-          id="closeProductModal"
           type="button"
+          id="closeProductModal"
           class="modal-close"
           aria-label="Close"
         >
@@ -520,231 +345,221 @@
       </div>
 
 
-      <!-- PRODUCT FORM -->
       <form id="productForm">
+
+        <input
+          type="hidden"
+          id="editingProductId"
+          value=""
+        >
 
 
         <!-- IMAGE -->
+
         <div class="image-upload-section">
 
-          <div
-            id="imagePreview"
-            class="image-preview"
-          >
-            No image
+          <div id="imagePreview" class="image-preview">
+            <span>Product Image</span>
           </div>
-
 
           <div class="image-upload-controls">
 
-            <label class="upload-btn">
-
+            <label
+              for="productImage"
+              class="upload-btn"
+            >
               Choose Image
-
-              <input
-                id="productImage"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-              >
-
             </label>
-
-            <small>
-              JPG, PNG or WEBP — maximum 5MB.
-            </small>
-
-            <small id="currentImageText"></small>
-
-          </div>
-
-        </div>
-
-
-        <!-- BASIC INFORMATION -->
-        <div class="form-section">
-
-          <h3>
-            Basic Information
-          </h3>
-
-
-          <div class="form-grid">
-
-            <label class="form-field">
-
-              <span>
-                Product Code
-              </span>
-
-              <input
-                id="productCode"
-                type="text"
-                placeholder="e.g. P001"
-                required
-              >
-
-            </label>
-
-
-            <label class="form-field">
-
-              <span>
-                Product Name
-              </span>
-
-              <input
-                id="productName"
-                type="text"
-                placeholder="Product name"
-                required
-              >
-
-            </label>
-
-
-            <label class="form-field">
-
-              <span>
-                Price
-              </span>
-
-              <input
-                id="productPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0"
-                required
-              >
-
-            </label>
-
-
-            <label class="form-field">
-
-              <span>
-                Old Price
-              </span>
-
-              <input
-                id="productOldPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Optional"
-              >
-
-            </label>
-
-
-            <label class="form-field">
-
-              <span>
-                Stock
-              </span>
-
-              <input
-                id="productStock"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="0"
-                required
-              >
-
-            </label>
-
-
-            <label class="form-field">
-
-              <span>
-                Category
-              </span>
-
-              <input
-                id="productCategory"
-                type="text"
-                placeholder="e.g. Perfumes"
-              >
-
-            </label>
-
-
-            <label class="form-field full-width">
-
-              <span>
-                Description
-              </span>
-
-              <textarea
-                id="productDescription"
-                placeholder="Product description..."
-              ></textarea>
-
-            </label>
-
-          </div>
-
-        </div>
-
-
-        <!-- ACTIVE STATUS -->
-        <div class="form-section">
-
-          <h3>
-            Visibility
-          </h3>
-
-
-          <label class="checkbox-field">
 
             <input
-              id="productActive"
-              type="checkbox"
-              checked
+              type="file"
+              id="productImage"
+              accept="image/*"
+              hidden
             >
 
-            <div>
+            <p id="currentImageText">
+              JPG, PNG or WEBP
+            </p>
 
-              <strong>
-                Product is Active
-              </strong>
-
-              <small>
-                Active products are visible on the public store.
-                Uncheck to hide the product without deleting it.
-              </small>
-
-            </div>
-
-          </label>
+          </div>
 
         </div>
 
 
-        <!-- MESSAGE -->
+        <!-- CODE + NAME -->
+
+        <div class="form-grid two">
+
+          <div class="form-field">
+
+            <label for="productCode">
+              Product Code *
+            </label>
+
+            <input
+              type="text"
+              id="productCode"
+              placeholder="e.g. P001"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-field">
+
+            <label for="productName">
+              Product Name *
+            </label>
+
+            <input
+              type="text"
+              id="productName"
+              placeholder="Product name"
+              required
+            >
+
+          </div>
+
+        </div>
+
+
+        <!-- PRICE -->
+
+        <div class="form-grid two">
+
+          <div class="form-field">
+
+            <label for="productPrice">
+              Price *
+            </label>
+
+            <input
+              type="number"
+              id="productPrice"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-field">
+
+            <label for="productOldPrice">
+              Old Price
+            </label>
+
+            <input
+              type="number"
+              id="productOldPrice"
+              min="0"
+              step="0.01"
+              placeholder="Optional"
+            >
+
+          </div>
+
+        </div>
+
+
+        <!-- STOCK + CATEGORY -->
+
+        <div class="form-grid two">
+
+          <div class="form-field">
+
+            <label for="productStock">
+              Stock *
+            </label>
+
+            <input
+              type="number"
+              id="productStock"
+              min="0"
+              step="1"
+              placeholder="0"
+              required
+            >
+
+          </div>
+
+
+          <div class="form-field">
+
+            <label for="productCategory">
+              Category
+            </label>
+
+            <input
+              type="text"
+              id="productCategory"
+              placeholder="e.g. Beauty"
+            >
+
+          </div>
+
+        </div>
+
+
+        <!-- DESCRIPTION -->
+
+        <div class="form-field">
+
+          <label for="productDescription">
+            Description
+          </label>
+
+          <textarea
+            id="productDescription"
+            rows="4"
+            placeholder="Product description..."
+          ></textarea>
+
+        </div>
+
+
+        <!-- ACTIVE -->
+
+        <label class="checkbox-field">
+
+          <input
+            type="checkbox"
+            id="productActive"
+            checked
+          >
+
+          <span>
+            Product is active and visible on store
+          </span>
+
+        </label>
+
+
         <div
           id="productFormMessage"
           class="form-message"
-          aria-live="polite"
         ></div>
 
 
         <!-- ACTIONS -->
+
         <div class="form-actions">
 
           <button
-            id="cancelProductButton"
             type="button"
+            id="cancelProductButton"
             class="secondary-btn"
           >
             Cancel
           </button>
 
-
           <button
-            id="saveProductButton"
             type="submit"
+            id="saveProductButton"
             class="primary-btn"
           >
             Save Product
@@ -759,55 +574,51 @@
   </div>
 
 
-  <!-- =====================================================
+  <!-- =========================
        CONFIRM MODAL
-       ===================================================== -->
+  ========================== -->
 
   <div
     id="confirmModal"
     class="modal"
     aria-hidden="true"
+    style="display:none;"
   >
 
-    <div class="modal-overlay"></div>
-
+    <div
+      class="modal-overlay"
+      id="confirmModalOverlay"
+    ></div>
 
     <div
-      class="modal-content confirm-modal-content"
+      class="modal-content confirm-content"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="confirmTitle"
     >
 
-      <div class="confirm-icon">
-        ⚠️
-      </div>
-
+      <div class="confirm-icon">!</div>
 
       <h2 id="confirmTitle">
         Confirm Action
       </h2>
 
-
       <p id="confirmText">
         Are you sure?
       </p>
 
-
-      <div class="confirm-actions">
+      <div class="form-actions">
 
         <button
-          id="cancelConfirmButton"
           type="button"
+          id="cancelConfirmButton"
           class="secondary-btn"
         >
           Cancel
         </button>
 
-
         <button
-          id="confirmActionButton"
           type="button"
+          id="confirmActionButton"
           class="danger-btn"
         >
           Confirm
@@ -820,23 +631,17 @@
   </div>
 
 
-  <!-- =====================================================
-       TOAST
-       ===================================================== -->
+  <!-- TOAST -->
 
   <div
     id="adminToast"
     class="admin-toast"
+    role="status"
     aria-live="polite"
   ></div>
 
 
-  <!-- =====================================================
-       ADMIN JAVASCRIPT
-       ===================================================== -->
-
-  <script src="admin.js?v=999"></script>
+  <script src="admin.js?v=20261007-1"></script>
 
 </body>
 </html>
-```
