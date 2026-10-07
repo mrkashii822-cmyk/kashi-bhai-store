@@ -5,6 +5,7 @@
 
 "use strict";
 
+
 /* =========================================================
    SUPABASE
 ========================================================= */
@@ -22,6 +23,10 @@ const supabaseClient =
   );
 
 
+const STORAGE_BUCKET =
+  "product-images";
+
+
 /* =========================================================
    STATE
 ========================================================= */
@@ -30,7 +35,6 @@ let products = [];
 let filteredProducts = [];
 
 let currentConfirmAction = null;
-
 let toastTimer = null;
 
 
@@ -99,7 +103,9 @@ const outOfStockProducts =
   document.getElementById("outOfStockProducts");
 
 
-/* PRODUCT MODAL */
+/* =========================================================
+   PRODUCT MODAL
+========================================================= */
 
 const productModal =
   document.getElementById("productModal");
@@ -162,7 +168,9 @@ const productFormMessage =
   document.getElementById("productFormMessage");
 
 
-/* CONFIRM */
+/* =========================================================
+   CONFIRM MODAL
+========================================================= */
 
 const confirmModal =
   document.getElementById("confirmModal");
@@ -183,14 +191,16 @@ const cancelConfirmButton =
   document.getElementById("cancelConfirmButton");
 
 
-/* TOAST */
+/* =========================================================
+   TOAST
+========================================================= */
 
 const adminToast =
   document.getElementById("adminToast");
 
 
 /* =========================================================
-   INITIALIZATION
+   INIT
 ========================================================= */
 
 document.addEventListener(
@@ -201,23 +211,10 @@ document.addEventListener(
 
 async function initializeAdmin() {
 
-  /*
-    Make absolutely sure modals cannot cover
-    the login screen on first page load.
-  */
-
   forceCloseModal(productModal);
   forceCloseModal(confirmModal);
 
-  if (loginScreen) {
-    loginScreen.classList.remove("hidden");
-    loginScreen.style.display = "flex";
-  }
-
-  if (adminApp) {
-    adminApp.classList.add("hidden");
-    adminApp.style.display = "none";
-  }
+  showLoginScreen();
 
   setupEventListeners();
 
@@ -249,12 +246,16 @@ async function initializeAdmin() {
       }
     );
 
+
     const {
       data,
       error
-    } = await supabaseClient.auth.getSession();
+    } =
+      await supabaseClient.auth.getSession();
+
 
     if (error) {
+
       console.error(
         "Session error:",
         error
@@ -265,10 +266,9 @@ async function initializeAdmin() {
       return;
     }
 
+
     if (
-      data &&
-      data.session &&
-      data.session.user
+      data?.session?.user
     ) {
 
       await handleAuthenticatedUser(
@@ -301,112 +301,151 @@ async function initializeAdmin() {
 
 function setupEventListeners() {
 
-  if (loginForm) {
-    loginForm.addEventListener(
-      "submit",
-      handleLogin
-    );
-  }
+  loginForm?.addEventListener(
+    "submit",
+    handleLogin
+  );
 
-  if (logoutButton) {
-    logoutButton.addEventListener(
-      "click",
-      handleLogout
-    );
-  }
 
-  if (addProductButton) {
-    addProductButton.addEventListener(
-      "click",
-      () => openAddProductModal()
-    );
-  }
+  logoutButton?.addEventListener(
+    "click",
+    handleLogout
+  );
 
-  if (refreshProductsButton) {
-    refreshProductsButton.addEventListener(
-      "click",
-      () => loadProducts(true)
-    );
-  }
 
-  if (adminSearch) {
-    adminSearch.addEventListener(
-      "input",
-      applyFilters
-    );
-  }
+  addProductButton?.addEventListener(
+    "click",
+    openAddProductModal
+  );
 
-  if (adminStatusFilter) {
-    adminStatusFilter.addEventListener(
-      "change",
-      applyFilters
-    );
-  }
 
-  if (productForm) {
-    productForm.addEventListener(
-      "submit",
-      handleProductSubmit
-    );
-  }
+  refreshProductsButton?.addEventListener(
+    "click",
+    () => loadProducts(true)
+  );
 
-  if (productImage) {
-    productImage.addEventListener(
-      "change",
-      handleImagePreview
-    );
-  }
 
-  if (closeProductModal) {
-    closeProductModal.addEventListener(
-      "click",
-      () => closeModal(productModal)
-    );
-  }
+  adminSearch?.addEventListener(
+    "input",
+    applyFilters
+  );
 
-  if (cancelProductButton) {
-    cancelProductButton.addEventListener(
-      "click",
-      () => closeModal(productModal)
-    );
-  }
 
-  if (productModalOverlay) {
-    productModalOverlay.addEventListener(
-      "click",
-      () => closeModal(productModal)
-    );
-  }
+  adminStatusFilter?.addEventListener(
+    "change",
+    applyFilters
+  );
 
-  if (cancelConfirmButton) {
-    cancelConfirmButton.addEventListener(
-      "click",
-      () => closeModal(confirmModal)
-    );
-  }
 
-  if (confirmModalOverlay) {
-    confirmModalOverlay.addEventListener(
-      "click",
-      () => closeModal(confirmModal)
-    );
-  }
+  productForm?.addEventListener(
+    "submit",
+    handleProductSubmit
+  );
 
-  if (confirmActionButton) {
-    confirmActionButton.addEventListener(
-      "click",
-      executeConfirmAction
-    );
-  }
 
-  if (productsTableBody) {
+  productImage?.addEventListener(
+    "change",
+    handleImagePreview
+  );
 
-    productsTableBody.addEventListener(
-      "click",
-      handleProductTableClick
-    );
 
-  }
+  closeProductModal?.addEventListener(
+    "click",
+    event => {
+
+      event.preventDefault();
+
+      closeModal(productModal);
+
+    }
+  );
+
+
+  cancelProductButton?.addEventListener(
+    "click",
+    event => {
+
+      event.preventDefault();
+
+      closeModal(productModal);
+
+    }
+  );
+
+
+  productModalOverlay?.addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target ===
+        productModalOverlay
+      ) {
+
+        closeModal(productModal);
+
+      }
+
+    }
+  );
+
+
+  cancelConfirmButton?.addEventListener(
+    "click",
+    event => {
+
+      event.preventDefault();
+
+      closeModal(confirmModal);
+
+      currentConfirmAction = null;
+
+    }
+  );
+
+
+  confirmModalOverlay?.addEventListener(
+    "click",
+    event => {
+
+      if (
+        event.target ===
+        confirmModalOverlay
+      ) {
+
+        closeModal(confirmModal);
+
+        currentConfirmAction = null;
+
+      }
+
+    }
+  );
+
+
+  confirmActionButton?.addEventListener(
+    "click",
+    executeConfirmAction
+  );
+
+
+  productsTableBody?.addEventListener(
+    "click",
+    handleProductTableClick
+  );
+
+
+  /*
+    Extra delegated click protection.
+    This makes × and Cancel work even if
+    another element interferes with direct listeners.
+  */
+
+  document.addEventListener(
+    "click",
+    handleGlobalModalClicks
+  );
+
 
   document.addEventListener(
     "keydown",
@@ -415,7 +454,10 @@ function setupEventListeners() {
       if (event.key === "Escape") {
 
         closeModal(productModal);
+
         closeModal(confirmModal);
+
+        currentConfirmAction = null;
 
       }
 
@@ -426,7 +468,58 @@ function setupEventListeners() {
 
 
 /* =========================================================
-   AUTH
+   GLOBAL MODAL CLICK PROTECTION
+========================================================= */
+
+function handleGlobalModalClicks(event) {
+
+  if (
+    event.target.closest(
+      "#closeProductModal"
+    )
+  ) {
+
+    event.preventDefault();
+
+    closeModal(productModal);
+
+    return;
+  }
+
+
+  if (
+    event.target.closest(
+      "#cancelProductButton"
+    )
+  ) {
+
+    event.preventDefault();
+
+    closeModal(productModal);
+
+    return;
+  }
+
+
+  if (
+    event.target.closest(
+      "#cancelConfirmButton"
+    )
+  ) {
+
+    event.preventDefault();
+
+    closeModal(confirmModal);
+
+    currentConfirmAction = null;
+
+  }
+
+}
+
+
+/* =========================================================
+   LOGIN
 ========================================================= */
 
 async function handleLogin(event) {
@@ -439,6 +532,7 @@ async function handleLogin(event) {
   const password =
     loginPassword?.value || "";
 
+
   if (!email || !password) {
 
     showLoginMessage(
@@ -449,6 +543,7 @@ async function handleLogin(event) {
     return;
   }
 
+
   setButtonLoading(
     loginButton,
     loginButtonText,
@@ -456,7 +551,9 @@ async function handleLogin(event) {
     "Signing in..."
   );
 
+
   clearLoginMessage();
+
 
   try {
 
@@ -469,21 +566,24 @@ async function handleLogin(event) {
         password
       });
 
+
     if (error) {
       throw error;
     }
 
-    if (
-      !data ||
-      !data.user
-    ) {
+
+    if (!data?.user) {
+
       throw new Error(
         "Login failed. Please try again."
       );
+
     }
+
 
     const isAdmin =
       await verifyAdmin();
+
 
     if (!isAdmin) {
 
@@ -495,12 +595,15 @@ async function handleLogin(event) {
 
     }
 
+
     showToast(
       "Login successful.",
       "success"
     );
 
+
     await showAdminApp();
+
 
   } catch (error) {
 
@@ -509,10 +612,12 @@ async function handleLogin(event) {
       error
     );
 
+
     showLoginMessage(
       getFriendlyError(error),
       "error"
     );
+
 
   } finally {
 
@@ -527,6 +632,10 @@ async function handleLogin(event) {
 
 }
 
+
+/* =========================================================
+   LOGOUT
+========================================================= */
 
 async function handleLogout() {
 
@@ -549,7 +658,7 @@ async function handleLogout() {
 
 
 /* =========================================================
-   ADMIN VERIFICATION
+   ADMIN CHECK
 ========================================================= */
 
 async function verifyAdmin() {
@@ -564,6 +673,7 @@ async function verifyAdmin() {
         "is_admin"
       );
 
+
     if (error) {
 
       console.error(
@@ -573,6 +683,7 @@ async function verifyAdmin() {
 
       return false;
     }
+
 
     return data === true;
 
@@ -584,10 +695,15 @@ async function verifyAdmin() {
     );
 
     return false;
+
   }
 
 }
 
+
+/* =========================================================
+   AUTH USER
+========================================================= */
 
 async function handleAuthenticatedUser(user) {
 
@@ -598,8 +714,10 @@ async function handleAuthenticatedUser(user) {
     return;
   }
 
+
   const isAdmin =
     await verifyAdmin();
+
 
   if (!isAdmin) {
 
@@ -607,15 +725,23 @@ async function handleAuthenticatedUser(user) {
       "Authenticated user is not an admin."
     );
 
+
     await supabaseClient.auth.signOut();
+
+
+    showLoginScreen();
+
 
     showLoginMessage(
       "This account does not have admin access.",
       "error"
     );
 
+
     return;
+
   }
+
 
   await showAdminApp();
 
@@ -628,17 +754,13 @@ async function handleAuthenticatedUser(user) {
 
 function showLoginScreen() {
 
-  /*
-    VERY IMPORTANT:
-    Close every modal before showing login.
-    This prevents any overlay from blurring/covering
-    the login screen.
-  */
-
   forceCloseModal(productModal);
   forceCloseModal(confirmModal);
 
+  currentConfirmAction = null;
+
   document.body.style.overflow = "";
+
 
   if (loginScreen) {
 
@@ -652,9 +774,10 @@ function showLoginScreen() {
 
     loginScreen.style.filter = "none";
 
-    loginScreen.style.backdropFilter = "none";
+    loginScreen.style.pointerEvents = "auto";
 
   }
+
 
   if (adminApp) {
 
@@ -663,6 +786,7 @@ function showLoginScreen() {
     adminApp.style.display = "none";
 
   }
+
 
   if (loginEmail) {
 
@@ -675,6 +799,10 @@ function showLoginScreen() {
 
 }
 
+
+/* =========================================================
+   SHOW ADMIN
+========================================================= */
 
 async function showAdminApp() {
 
@@ -689,6 +817,7 @@ async function showAdminApp() {
 
   }
 
+
   if (adminApp) {
 
     adminApp.classList.remove("hidden");
@@ -697,16 +826,19 @@ async function showAdminApp() {
 
   }
 
+
   await loadProducts();
 
 }
 
 
 /* =========================================================
-   PRODUCTS
+   LOAD PRODUCTS
 ========================================================= */
 
-async function loadProducts(showLoading = false) {
+async function loadProducts(
+  showLoading = false
+) {
 
   if (showLoading) {
 
@@ -715,6 +847,7 @@ async function loadProducts(showLoading = false) {
     );
 
   }
+
 
   try {
 
@@ -746,22 +879,31 @@ async function loadProducts(showLoading = false) {
           }
         );
 
+
     if (error) {
       throw error;
     }
+
 
     products =
       Array.isArray(data)
         ? data
         : [];
 
+
     updateStats();
 
     applyFilters();
 
+
     setAdminStatus(
-      `${products.length} product${products.length === 1 ? "" : "s"} loaded.`
+      `${products.length} product${
+        products.length === 1
+          ? ""
+          : "s"
+      } loaded.`
     );
+
 
   } catch (error) {
 
@@ -770,11 +912,6 @@ async function loadProducts(showLoading = false) {
       error
     );
 
-    setAdminStatus(
-      "Could not load products: " +
-      getFriendlyError(error),
-      true
-    );
 
     products = [];
 
@@ -782,7 +919,79 @@ async function loadProducts(showLoading = false) {
 
     applyFilters();
 
+
+    setAdminStatus(
+      "Could not load products: " +
+      getFriendlyError(error),
+      true
+    );
+
   }
+
+}
+
+
+/* =========================================================
+   IMAGE URL
+========================================================= */
+
+function getProductImageUrl(
+  imageValue
+) {
+
+  if (!imageValue) {
+    return null;
+  }
+
+
+  const value =
+    String(imageValue).trim();
+
+
+  if (!value) {
+    return null;
+  }
+
+
+  /*
+    Already a complete URL
+  */
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  ) {
+
+    return value;
+
+  }
+
+
+  /*
+    Supabase storage path.
+    Convert filename/path to public URL.
+  */
+
+  const cleanPath =
+    value
+      .replace(/^\/+/, "")
+      .replace(
+        /^product-images\//i,
+        ""
+      );
+
+
+  const {
+    data
+  } =
+    supabaseClient
+      .storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(cleanPath);
+
+
+  return data?.publicUrl || null;
 
 }
 
@@ -800,52 +1009,84 @@ function applyFilters() {
       .trim()
       .toLowerCase();
 
+
   const status =
     adminStatusFilter?.value || "all";
 
+
   filteredProducts =
-    products.filter(product => {
+    products.filter(
+      product => {
 
-      const matchesSearch =
-        !search ||
-        String(product.product_code || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(product.name || "")
-          .toLowerCase()
-          .includes(search) ||
-        String(product.category || "")
-          .toLowerCase()
-          .includes(search);
+        const matchesSearch =
+          !search ||
+          String(
+            product.product_code || ""
+          )
+            .toLowerCase()
+            .includes(search) ||
 
-      if (!matchesSearch) {
-        return false;
+          String(
+            product.name || ""
+          )
+            .toLowerCase()
+            .includes(search) ||
+
+          String(
+            product.category || ""
+          )
+            .toLowerCase()
+            .includes(search);
+
+
+        if (!matchesSearch) {
+          return false;
+        }
+
+
+        if (
+          status === "active"
+        ) {
+
+          return (
+            product.is_active === true &&
+            Number(
+              product.stock || 0
+            ) > 0
+          );
+
+        }
+
+
+        if (
+          status === "hidden"
+        ) {
+
+          return (
+            product.is_active === false
+          );
+
+        }
+
+
+        if (
+          status === "out_of_stock"
+        ) {
+
+          return (
+            Number(
+              product.stock || 0
+            ) <= 0
+          );
+
+        }
+
+
+        return true;
+
       }
+    );
 
-      if (status === "active") {
-
-        return (
-          product.is_active === true &&
-          Number(product.stock || 0) > 0
-        );
-
-      }
-
-      if (status === "hidden") {
-
-        return product.is_active === false;
-
-      }
-
-      if (status === "out_of_stock") {
-
-        return Number(product.stock || 0) <= 0;
-
-      }
-
-      return true;
-
-    });
 
   renderProducts();
 
@@ -862,20 +1103,25 @@ function renderProducts() {
     return;
   }
 
+
   productsTableBody.innerHTML = "";
+
 
   if (!filteredProducts.length) {
 
-    if (emptyTable) {
-      emptyTable.classList.remove("hidden");
-    }
+    emptyTable?.classList.remove(
+      "hidden"
+    );
 
     return;
+
   }
 
-  if (emptyTable) {
-    emptyTable.classList.add("hidden");
-  }
+
+  emptyTable?.classList.add(
+    "hidden"
+  );
+
 
   filteredProducts.forEach(
     product => {
@@ -890,22 +1136,41 @@ function renderProducts() {
 }
 
 
-function createProductRow(product) {
+/* =========================================================
+   CREATE ROW
+========================================================= */
+
+function createProductRow(
+  product
+) {
 
   const tr =
     document.createElement("tr");
 
+
+  const imageUrl =
+    getProductImageUrl(
+      product.image_url
+    );
+
+
   const image =
-    product.image_url
+    imageUrl
+
       ? `
         <div class="product-table-image">
           <img
-            src="${escapeAttribute(product.image_url)}"
-            alt="${escapeAttribute(product.name || "Product")}"
+            src="${escapeAttribute(imageUrl)}"
+            alt="${escapeAttribute(
+              product.name ||
+              "Product"
+            )}"
             loading="lazy"
+            onerror="this.parentElement.innerHTML='<div class=&quot;product-image-placeholder&quot;>No Image</div>'"
           >
         </div>
       `
+
       : `
         <div class="product-table-image">
           <div class="product-image-placeholder">
@@ -914,37 +1179,71 @@ function createProductRow(product) {
         </div>
       `;
 
+
   const stock =
-    Number(product.stock || 0);
+    Number(
+      product.stock || 0
+    );
+
 
   let stockClass =
     "stock-value";
 
+
   if (stock <= 0) {
-    stockClass += " stock-out";
+
+    stockClass +=
+      " stock-out";
+
   } else if (stock <= 5) {
-    stockClass += " stock-low";
+
+    stockClass +=
+      " stock-low";
+
   }
+
 
   const statusHtml =
     product.is_active
+
       ? (
           stock <= 0
-            ? `<span class="status-badge status-out">Out of Stock</span>`
-            : `<span class="status-badge status-active">Active</span>`
+
+            ? `
+              <span class="status-badge status-out">
+                Out of Stock
+              </span>
+            `
+
+            : `
+              <span class="status-badge status-active">
+                Active
+              </span>
+            `
         )
-      : `<span class="status-badge status-hidden">Hidden</span>`;
+
+      : `
+        <span class="status-badge status-hidden">
+          Hidden
+        </span>
+      `;
+
 
   const oldPrice =
     product.old_price !== null &&
     product.old_price !== undefined &&
     Number(product.old_price) > 0
+
       ? `
         <span class="old-price">
-          ${formatPrice(product.old_price)}
+          ${formatPrice(
+            product.old_price
+          )}
         </span>
       `
+
       : "";
+
 
   tr.innerHTML = `
 
@@ -957,11 +1256,17 @@ function createProductRow(product) {
         <div class="product-table-info">
 
           <strong>
-            ${escapeHtml(product.name || "Unnamed")}
+            ${escapeHtml(
+              product.name ||
+              "Unnamed"
+            )}
           </strong>
 
           <span>
-            ${escapeHtml(product.category || "No category")}
+            ${escapeHtml(
+              product.category ||
+              "No category"
+            )}
           </span>
 
         </div>
@@ -973,7 +1278,10 @@ function createProductRow(product) {
 
     <td>
       <span class="product-code">
-        ${escapeHtml(product.product_code || "-")}
+        ${escapeHtml(
+          product.product_code ||
+          "-"
+        )}
       </span>
     </td>
 
@@ -981,7 +1289,9 @@ function createProductRow(product) {
     <td class="price-cell">
 
       <strong>
-        ${formatPrice(product.price)}
+        ${formatPrice(
+          product.price
+        )}
       </strong>
 
       ${oldPrice}
@@ -1011,29 +1321,37 @@ function createProductRow(product) {
           type="button"
           class="table-action"
           data-action="edit"
-          data-id="${product.id}"
+          data-id="${escapeAttribute(
+            product.id
+          )}"
         >
           Edit
         </button>
 
         ${
           product.is_active
+
             ? `
               <button
                 type="button"
                 class="table-action danger"
                 data-action="hide"
-                data-id="${product.id}"
+                data-id="${escapeAttribute(
+                  product.id
+                )}"
               >
                 Hide
               </button>
             `
+
             : `
               <button
                 type="button"
                 class="table-action"
                 data-action="reactivate"
-                data-id="${product.id}"
+                data-id="${escapeAttribute(
+                  product.id
+                )}"
               >
                 Reactivate
               </button>
@@ -1046,7 +1364,9 @@ function createProductRow(product) {
 
   `;
 
+
   return tr;
+
 }
 
 
@@ -1054,45 +1374,79 @@ function createProductRow(product) {
    TABLE ACTIONS
 ========================================================= */
 
-function handleProductTableClick(event) {
+function handleProductTableClick(
+  event
+) {
 
   const button =
     event.target.closest(
       "[data-action]"
     );
 
+
   if (!button) {
     return;
   }
 
+
   const action =
     button.dataset.action;
+
 
   const id =
     button.dataset.id;
 
+
   const product =
     products.find(
       item =>
-        String(item.id) === String(id)
+        String(item.id) ===
+        String(id)
     );
 
+
   if (!product) {
+
+    showToast(
+      "Product could not be found.",
+      "error"
+    );
+
     return;
+
   }
 
-  if (action === "edit") {
 
-    openEditProductModal(product);
+  if (
+    action === "edit"
+  ) {
 
-  } else if (action === "hide") {
+    openEditProductModal(
+      product
+    );
+
+    return;
+
+  }
+
+
+  if (
+    action === "hide"
+  ) {
 
     askProductAction(
       product,
       "hide"
     );
 
-  } else if (action === "reactivate") {
+    return;
+
+  }
+
+
+  if (
+    action === "reactivate"
+  ) {
 
     askProductAction(
       product,
@@ -1114,20 +1468,30 @@ function openAddProductModal() {
     return;
   }
 
+
   productForm.reset();
+
 
   if (editingProductId) {
     editingProductId.value = "";
   }
 
+
   if (productModalTitle) {
+
     productModalTitle.textContent =
       "Add Product";
+
   }
 
+
   if (productActive) {
-    productActive.checked = true;
+
+    productActive.checked =
+      true;
+
   }
+
 
   if (imagePreview) {
 
@@ -1136,6 +1500,7 @@ function openAddProductModal() {
 
   }
 
+
   if (currentImageText) {
 
     currentImageText.textContent =
@@ -1143,7 +1508,9 @@ function openAddProductModal() {
 
   }
 
+
   clearProductFormMessage();
+
 
   openModal(productModal);
 
@@ -1154,78 +1521,124 @@ function openAddProductModal() {
    EDIT PRODUCT
 ========================================================= */
 
-function openEditProductModal(product) {
+function openEditProductModal(
+  product
+) {
 
   if (!productForm) {
     return;
   }
 
+
   if (editingProductId) {
+
     editingProductId.value =
       product.id || "";
+
   }
+
 
   if (productModalTitle) {
+
     productModalTitle.textContent =
       "Edit Product";
+
   }
+
 
   if (productCode) {
+
     productCode.value =
       product.product_code || "";
+
   }
+
 
   if (productName) {
+
     productName.value =
       product.name || "";
+
   }
+
 
   if (productPrice) {
+
     productPrice.value =
       product.price ?? "";
+
   }
+
 
   if (productOldPrice) {
+
     productOldPrice.value =
       product.old_price ?? "";
+
   }
+
 
   if (productStock) {
+
     productStock.value =
       product.stock ?? 0;
+
   }
+
 
   if (productCategory) {
+
     productCategory.value =
       product.category || "";
+
   }
+
 
   if (productDescription) {
+
     productDescription.value =
       product.description || "";
+
   }
+
 
   if (productActive) {
+
     productActive.checked =
       product.is_active !== false;
+
   }
+
 
   if (productImage) {
+
     productImage.value = "";
+
   }
 
-  if (product.image_url) {
+
+  const imageUrl =
+    getProductImageUrl(
+      product.image_url
+    );
+
+
+  if (imageUrl) {
 
     if (imagePreview) {
 
       imagePreview.innerHTML = `
         <img
-          src="${escapeAttribute(product.image_url)}"
+          src="${escapeAttribute(
+            imageUrl
+          )}"
           alt="Current product image"
+          onerror="this.parentElement.innerHTML='<span>Image not found</span>'"
         >
       `;
 
     }
+
 
     if (currentImageText) {
 
@@ -1237,18 +1650,25 @@ function openEditProductModal(product) {
   } else {
 
     if (imagePreview) {
+
       imagePreview.innerHTML =
         "<span>Product Image</span>";
+
     }
 
+
     if (currentImageText) {
+
       currentImageText.textContent =
         "No image uploaded.";
+
     }
 
   }
 
+
   clearProductFormMessage();
+
 
   openModal(productModal);
 
@@ -1259,43 +1679,61 @@ function openEditProductModal(product) {
    SAVE PRODUCT
 ========================================================= */
 
-async function handleProductSubmit(event) {
+async function handleProductSubmit(
+  event
+) {
 
   event.preventDefault();
 
+
   clearProductFormMessage();
+
 
   const productId =
     editingProductId?.value || "";
 
+
   const code =
     productCode?.value.trim() || "";
+
 
   const name =
     productName?.value.trim() || "";
 
+
   const price =
-    Number(productPrice?.value);
+    Number(
+      productPrice?.value
+    );
+
 
   const oldPriceRaw =
     productOldPrice?.value.trim() || "";
+
 
   const oldPrice =
     oldPriceRaw === ""
       ? null
       : Number(oldPriceRaw);
 
+
   const stock =
-    Number(productStock?.value);
+    Number(
+      productStock?.value
+    );
+
 
   const category =
     productCategory?.value.trim() || "";
 
+
   const description =
     productDescription?.value.trim() || "";
 
+
   const isActive =
     productActive?.checked !== false;
+
 
   if (!code) {
 
@@ -1305,7 +1743,9 @@ async function handleProductSubmit(event) {
     );
 
     return;
+
   }
+
 
   if (!name) {
 
@@ -1315,7 +1755,9 @@ async function handleProductSubmit(event) {
     );
 
     return;
+
   }
+
 
   if (
     !Number.isFinite(price) ||
@@ -1328,7 +1770,9 @@ async function handleProductSubmit(event) {
     );
 
     return;
+
   }
+
 
   if (
     oldPrice !== null &&
@@ -1344,7 +1788,9 @@ async function handleProductSubmit(event) {
     );
 
     return;
+
   }
+
 
   if (
     !Number.isInteger(stock) ||
@@ -1357,7 +1803,9 @@ async function handleProductSubmit(event) {
     );
 
     return;
+
   }
+
 
   setButtonLoading(
     saveProductButton,
@@ -1366,15 +1814,22 @@ async function handleProductSubmit(event) {
     "Saving..."
   );
 
+
   try {
 
     let imageUrl =
-      getExistingProductImage(productId);
+      getExistingProductImage(
+        productId
+      );
+
+
+    /*
+      Upload only if user selected
+      a new image.
+    */
 
     if (
-      productImage &&
-      productImage.files &&
-      productImage.files.length > 0
+      productImage?.files?.length > 0
     ) {
 
       imageUrl =
@@ -1385,15 +1840,20 @@ async function handleProductSubmit(event) {
 
     }
 
+
     const payload = {
 
-      product_code: code,
+      product_code:
+        code,
 
-      name,
+      name:
+        name,
 
-      price,
+      price:
+        price,
 
-      old_price: oldPrice,
+      old_price:
+        oldPrice,
 
       category:
         category || null,
@@ -1401,7 +1861,8 @@ async function handleProductSubmit(event) {
       image_url:
         imageUrl || null,
 
-      stock,
+      stock:
+        stock,
 
       description:
         description || null,
@@ -1415,28 +1876,57 @@ async function handleProductSubmit(event) {
     };
 
 
+    /* =====================================================
+       UPDATE
+    ===================================================== */
+
     if (productId) {
 
       const {
+        data,
         error
       } =
         await supabaseClient
           .from("products")
           .update(payload)
-          .eq("id", productId);
+          .eq(
+            "id",
+            productId
+          )
+          .select()
+          .single();
+
 
       if (error) {
         throw error;
       }
+
+
+      if (!data) {
+
+        throw new Error(
+          "Product was not updated. Please check your admin permissions."
+        );
+
+      }
+
 
       showToast(
         "Product updated successfully.",
         "success"
       );
 
-    } else {
+
+    }
+
+    /* =====================================================
+       INSERT
+    ===================================================== */
+
+    else {
 
       const {
+        data,
         error
       } =
         await supabaseClient
@@ -1445,11 +1935,24 @@ async function handleProductSubmit(event) {
             ...payload,
             created_at:
               new Date().toISOString()
-          });
+          })
+          .select()
+          .single();
+
 
       if (error) {
         throw error;
       }
+
+
+      if (!data) {
+
+        throw new Error(
+          "Product could not be added."
+        );
+
+      }
+
 
       showToast(
         "Product added successfully.",
@@ -1458,9 +1961,12 @@ async function handleProductSubmit(event) {
 
     }
 
+
     closeModal(productModal);
 
+
     await loadProducts(true);
+
 
   } catch (error) {
 
@@ -1469,10 +1975,12 @@ async function handleProductSubmit(event) {
       error
     );
 
+
     showProductFormMessage(
       getFriendlyError(error),
       "error"
     );
+
 
   } finally {
 
@@ -1501,9 +2009,12 @@ async function uploadProductImage(
     return null;
   }
 
+
   if (
     !file.type ||
-    !file.type.startsWith("image/")
+    !file.type.startsWith(
+      "image/"
+    )
   ) {
 
     throw new Error(
@@ -1512,10 +2023,14 @@ async function uploadProductImage(
 
   }
 
+
   const maxSize =
     8 * 1024 * 1024;
 
-  if (file.size > maxSize) {
+
+  if (
+    file.size > maxSize
+  ) {
 
     throw new Error(
       "Image size must be less than 8 MB."
@@ -1523,21 +2038,26 @@ async function uploadProductImage(
 
   }
 
+
   const extension =
-    getFileExtension(file.name);
+    getFileExtension(
+      file.name
+    );
+
 
   const safeCode =
     productCode
-      .replace(/[^a-zA-Z0-9_-]/g, "-")
+      .replace(
+        /[^a-zA-Z0-9_-]/g,
+        "-"
+      )
       .toLowerCase();
+
 
   const uniqueName =
     `${safeCode}-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 8)}.${extension}`;
-
-  const path =
-    uniqueName;
 
 
   const {
@@ -1545,9 +2065,9 @@ async function uploadProductImage(
   } =
     await supabaseClient
       .storage
-      .from("product-images")
+      .from(STORAGE_BUCKET)
       .upload(
-        path,
+        uniqueName,
         file,
         {
           cacheControl: "3600",
@@ -1555,6 +2075,7 @@ async function uploadProductImage(
           contentType: file.type
         }
       );
+
 
   if (error) {
     throw error;
@@ -1566,12 +2087,14 @@ async function uploadProductImage(
   } =
     supabaseClient
       .storage
-      .from("product-images")
-      .getPublicUrl(path);
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(
+        uniqueName
+      );
+
 
   if (
-    !data ||
-    !data.publicUrl
+    !data?.publicUrl
   ) {
 
     throw new Error(
@@ -1579,6 +2102,7 @@ async function uploadProductImage(
     );
 
   }
+
 
   return data.publicUrl;
 
@@ -1594,12 +2118,16 @@ function handleImagePreview() {
   const file =
     productImage?.files?.[0];
 
+
   if (!file) {
     return;
   }
 
+
   if (
-    !file.type.startsWith("image/")
+    !file.type.startsWith(
+      "image/"
+    )
   ) {
 
     showProductFormMessage(
@@ -1607,13 +2135,17 @@ function handleImagePreview() {
       "error"
     );
 
+
     productImage.value = "";
 
     return;
+
   }
+
 
   const reader =
     new FileReader();
+
 
   reader.onload =
     event => {
@@ -1631,7 +2163,9 @@ function handleImagePreview() {
 
     };
 
+
   reader.readAsDataURL(file);
+
 
   if (currentImageText) {
 
@@ -1647,11 +2181,14 @@ function handleImagePreview() {
    EXISTING IMAGE
 ========================================================= */
 
-function getExistingProductImage(productId) {
+function getExistingProductImage(
+  productId
+) {
 
   if (!productId) {
     return null;
   }
+
 
   const product =
     products.find(
@@ -1660,7 +2197,17 @@ function getExistingProductImage(productId) {
         String(productId)
     );
 
-  return product?.image_url || null;
+
+  if (!product) {
+    return null;
+  }
+
+
+  return (
+    getProductImageUrl(
+      product.image_url
+    ) || null
+  );
 
 }
 
@@ -1674,44 +2221,84 @@ function askProductAction(
   action
 ) {
 
-  currentConfirmAction =
-    {
-      productId: product.id,
+  currentConfirmAction = {
+    productId:
+      product.id,
+
+    action:
       action
-    };
+  };
+
 
   if (action === "hide") {
 
-    confirmTitle.textContent =
-      "Hide Product";
+    if (confirmTitle) {
 
-    confirmText.textContent =
-      `"${product.name}" will be hidden from the store. You can reactivate it later.`;
+      confirmTitle.textContent =
+        "Hide Product";
 
-    confirmActionButton.textContent =
-      "Hide Product";
+    }
 
-    confirmActionButton.classList.add(
-      "danger-btn"
-    );
+
+    if (confirmText) {
+
+      confirmText.textContent =
+        `"${product.name}" will be hidden from the store. You can reactivate it later.`;
+
+    }
+
+
+    if (confirmActionButton) {
+
+      confirmActionButton.textContent =
+        "Hide Product";
+
+      confirmActionButton.classList.add(
+        "danger-btn"
+      );
+
+    }
 
   } else {
 
-    confirmTitle.textContent =
-      "Reactivate Product";
+    if (confirmTitle) {
 
-    confirmText.textContent =
-      `"${product.name}" will become visible on the store again.`;
+      confirmTitle.textContent =
+        "Reactivate Product";
 
-    confirmActionButton.textContent =
-      "Reactivate";
+    }
+
+
+    if (confirmText) {
+
+      confirmText.textContent =
+        `"${product.name}" will become visible on the store again.`;
+
+    }
+
+
+    if (confirmActionButton) {
+
+      confirmActionButton.textContent =
+        "Reactivate";
+
+      confirmActionButton.classList.remove(
+        "danger-btn"
+      );
+
+    }
 
   }
+
 
   openModal(confirmModal);
 
 }
 
+
+/* =========================================================
+   EXECUTE HIDE / REACTIVATE
+========================================================= */
 
 async function executeConfirmAction() {
 
@@ -1719,11 +2306,13 @@ async function executeConfirmAction() {
     return;
   }
 
+
   const {
     productId,
     action
   } =
     currentConfirmAction;
+
 
   setButtonLoading(
     confirmActionButton,
@@ -1734,28 +2323,50 @@ async function executeConfirmAction() {
       : "Activating..."
   );
 
+
   try {
 
     const isActive =
       action !== "hide";
 
+
     const {
+      data,
       error
     } =
       await supabaseClient
         .from("products")
         .update({
-          is_active: isActive,
+          is_active:
+            isActive,
+
           updated_at:
             new Date().toISOString()
         })
-        .eq("id", productId);
+        .eq(
+          "id",
+          productId
+        )
+        .select()
+        .single();
+
 
     if (error) {
       throw error;
     }
 
+
+    if (!data) {
+
+      throw new Error(
+        "Product status could not be changed."
+      );
+
+    }
+
+
     closeModal(confirmModal);
+
 
     showToast(
       action === "hide"
@@ -1764,9 +2375,12 @@ async function executeConfirmAction() {
       "success"
     );
 
+
     currentConfirmAction = null;
 
+
     await loadProducts(true);
+
 
   } catch (error) {
 
@@ -1775,10 +2389,12 @@ async function executeConfirmAction() {
       error
     );
 
+
     showToast(
       getFriendlyError(error),
       "error"
     );
+
 
   } finally {
 
@@ -1803,11 +2419,13 @@ function updateStats() {
   const total =
     products.length;
 
+
   const active =
     products.filter(
       product =>
         product.is_active === true
     ).length;
+
 
   const hidden =
     products.filter(
@@ -1815,30 +2433,45 @@ function updateStats() {
         product.is_active === false
     ).length;
 
+
   const outOfStock =
     products.filter(
       product =>
-        Number(product.stock || 0) <= 0
+        Number(
+          product.stock || 0
+        ) <= 0
     ).length;
 
+
   if (totalProducts) {
+
     totalProducts.textContent =
       total;
+
   }
+
 
   if (activeProducts) {
+
     activeProducts.textContent =
       active;
+
   }
+
 
   if (hiddenProducts) {
+
     hiddenProducts.textContent =
       hidden;
+
   }
 
+
   if (outOfStockProducts) {
+
     outOfStockProducts.textContent =
       outOfStock;
+
   }
 
 }
@@ -1854,14 +2487,36 @@ function openModal(modal) {
     return;
   }
 
-  modal.style.display = "flex";
 
-  modal.classList.add("open");
+  /*
+    IMPORTANT FIX:
+    Reset every property that forceCloseModal()
+    changes.
+  */
+
+  modal.style.display =
+    "flex";
+
+  modal.style.visibility =
+    "visible";
+
+  modal.style.opacity =
+    "1";
+
+  modal.style.pointerEvents =
+    "auto";
+
+
+  modal.classList.add(
+    "open"
+  );
+
 
   modal.setAttribute(
     "aria-hidden",
     "false"
   );
+
 
   document.body.style.overflow =
     "hidden";
@@ -1875,19 +2530,38 @@ function closeModal(modal) {
     return;
   }
 
-  modal.classList.remove("open");
+
+  modal.classList.remove(
+    "open"
+  );
+
 
   modal.style.display =
     "none";
+
+  modal.style.visibility =
+    "hidden";
+
+  modal.style.opacity =
+    "0";
+
+  modal.style.pointerEvents =
+    "none";
+
 
   modal.setAttribute(
     "aria-hidden",
     "true"
   );
 
+
   if (
-    !productModal?.classList.contains("open") &&
-    !confirmModal?.classList.contains("open")
+    !productModal?.classList.contains(
+      "open"
+    ) &&
+    !confirmModal?.classList.contains(
+      "open"
+    )
   ) {
 
     document.body.style.overflow =
@@ -1904,7 +2578,11 @@ function forceCloseModal(modal) {
     return;
   }
 
-  modal.classList.remove("open");
+
+  modal.classList.remove(
+    "open"
+  );
+
 
   modal.style.display =
     "none";
@@ -1918,6 +2596,7 @@ function forceCloseModal(modal) {
   modal.style.pointerEvents =
     "none";
 
+
   modal.setAttribute(
     "aria-hidden",
     "true"
@@ -1927,7 +2606,7 @@ function forceCloseModal(modal) {
 
 
 /* =========================================================
-   MESSAGES
+   LOGIN MESSAGES
 ========================================================= */
 
 function showLoginMessage(
@@ -1939,8 +2618,10 @@ function showLoginMessage(
     return;
   }
 
+
   loginMessage.textContent =
     message;
+
 
   loginMessage.className =
     `form-message ${type}`;
@@ -1954,14 +2635,20 @@ function clearLoginMessage() {
     return;
   }
 
+
   loginMessage.textContent =
     "";
+
 
   loginMessage.className =
     "form-message";
 
 }
 
+
+/* =========================================================
+   PRODUCT FORM MESSAGES
+========================================================= */
 
 function showProductFormMessage(
   message,
@@ -1972,8 +2659,10 @@ function showProductFormMessage(
     return;
   }
 
+
   productFormMessage.textContent =
     message;
+
 
   productFormMessage.className =
     `form-message ${type}`;
@@ -1987,14 +2676,20 @@ function clearProductFormMessage() {
     return;
   }
 
+
   productFormMessage.textContent =
     "";
+
 
   productFormMessage.className =
     "form-message";
 
 }
 
+
+/* =========================================================
+   ADMIN STATUS
+========================================================= */
 
 function setAdminStatus(
   message,
@@ -2005,8 +2700,10 @@ function setAdminStatus(
     return;
   }
 
+
   adminStatus.textContent =
     message;
+
 
   adminStatus.style.color =
     isError
@@ -2029,13 +2726,19 @@ function showToast(
     return;
   }
 
-  clearTimeout(toastTimer);
+
+  clearTimeout(
+    toastTimer
+  );
+
 
   adminToast.textContent =
     message;
 
+
   adminToast.className =
     `admin-toast show ${type}`;
+
 
   toastTimer =
     setTimeout(
@@ -2067,46 +2770,54 @@ function setButtonLoading(
     return;
   }
 
+
   button.disabled =
     loading;
+
 
   button.classList.toggle(
     "loading",
     loading
   );
 
+
   if (textElement) {
 
     textElement.textContent =
       text;
 
-  } else {
-
-    if (!button.dataset.originalText) {
-
-      button.dataset.originalText =
-        button.textContent;
-
-    }
-
-    button.textContent =
-      loading
-        ? text
-        : button.dataset.originalText;
+    return;
 
   }
+
+
+  if (
+    !button.dataset.originalText
+  ) {
+
+    button.dataset.originalText =
+      button.textContent.trim();
+
+  }
+
+
+  button.textContent =
+    loading
+      ? text
+      : button.dataset.originalText;
 
 }
 
 
 /* =========================================================
-   FORMATTING
+   PRICE
 ========================================================= */
 
 function formatPrice(value) {
 
   const number =
     Number(value || 0);
+
 
   return (
     "Rs. " +
@@ -2121,6 +2832,10 @@ function formatPrice(value) {
 }
 
 
+/* =========================================================
+   FILE EXTENSION
+========================================================= */
+
 function getFileExtension(
   filename
 ) {
@@ -2128,6 +2843,7 @@ function getFileExtension(
   const parts =
     String(filename || "")
       .split(".");
+
 
   return (
     parts.length > 1
@@ -2144,12 +2860,16 @@ function getFileExtension(
 
 
 /* =========================================================
-   SECURITY / HTML ESCAPING
+   HTML ESCAPE
 ========================================================= */
 
-function escapeHtml(value) {
+function escapeHtml(
+  value
+) {
 
-  return String(value ?? "")
+  return String(
+    value ?? ""
+  )
     .replace(
       /&/g,
       "&amp;"
@@ -2174,7 +2894,9 @@ function escapeHtml(value) {
 }
 
 
-function escapeAttribute(value) {
+function escapeAttribute(
+  value
+) {
 
   return escapeHtml(value);
 
@@ -2185,19 +2907,34 @@ function escapeAttribute(value) {
    ERROR HANDLING
 ========================================================= */
 
-function getFriendlyError(error) {
+function getFriendlyError(
+  error
+) {
 
   if (!error) {
-    return "Something went wrong.";
+
+    return (
+      "Something went wrong."
+    );
+
   }
+
 
   const message =
     error.message ||
     error.error_description ||
     String(error);
 
+
   const lower =
     message.toLowerCase();
+
+
+  console.error(
+    "Supabase error:",
+    error
+  );
+
 
   if (
     lower.includes(
@@ -2205,9 +2942,12 @@ function getFriendlyError(error) {
     )
   ) {
 
-    return "Incorrect email or password.";
+    return (
+      "Incorrect email or password."
+    );
 
   }
+
 
   if (
     lower.includes(
@@ -2215,9 +2955,12 @@ function getFriendlyError(error) {
     )
   ) {
 
-    return "Please confirm your email before logging in.";
+    return (
+      "Please confirm your email before logging in."
+    );
 
   }
+
 
   if (
     lower.includes(
@@ -2229,10 +2972,11 @@ function getFriendlyError(error) {
   ) {
 
     return (
-      "Permission denied. Please check the admin RLS policies."
+      "Permission denied. Admin RLS policy is blocking this action."
     );
 
   }
+
 
   if (
     lower.includes(
@@ -2246,17 +2990,35 @@ function getFriendlyError(error) {
 
   }
 
+
   if (
     lower.includes(
       "bucket"
+    ) ||
+    lower.includes(
+      "storage"
     )
   ) {
 
     return (
-      "Storage error. Please check the product-images bucket and its admin policies."
+      "Storage error. Check the product-images bucket and storage policies."
     );
 
   }
+
+
+  if (
+    lower.includes(
+      "permission denied"
+    )
+  ) {
+
+    return (
+      "Permission denied. Please check the admin permissions."
+    );
+
+  }
+
 
   return message;
 
